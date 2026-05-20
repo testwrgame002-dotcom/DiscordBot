@@ -1,0 +1,15 @@
+{
+  "name": "godpack-bot",
+  "version": "1.0.0",
+  "main": "index.js",
+  "scripts": {
+    "start": "node index.js"
+
+  },
+  "dependencies": {
+    "@upstash/redis": "^1.35.3",
+    "discord.js": "^14.0.0",
+    "node-fetch": "^2.6.7",
+      "axios": "^1.6.8"
+  }
+}
