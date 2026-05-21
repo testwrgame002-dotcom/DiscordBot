@@ -309,6 +309,7 @@ async function registerRivalDuoMember({
 }) {
   discordId = String(discordId)
   gameId = String(gameId || "").trim()
+  duoId = duoId ? String(duoId) : null
 
   if (!isValidGameId(gameId)) {
     return {
@@ -316,19 +317,6 @@ async function registerRivalDuoMember({
       message: "❌ ID must be exactly 16 digits."
     }
   }
-
-const allDuos = await loadAllRivalDuos()
-
-for (const duo of Object.values(allDuos)) {
-  if (!duo || !duo.members) continue
-
-  if (duo.id === duoId && duo.members[discordId]) {
-    return {
-      ok: false,
-      message: "❌ You are already registered in this Rival Duo."
-    }
-  }
-}
 
   let duo = null
 
@@ -339,6 +327,17 @@ for (const duo of Object.values(allDuos)) {
       return {
         ok: false,
         message: "❌ This Rival Duo no longer exists."
+      }
+    }
+
+    if (!duo.members || typeof duo.members !== "object") {
+      duo.members = {}
+    }
+
+    if (duo.members[discordId]) {
+      return {
+        ok: false,
+        message: "❌ You are already registered in this Rival Duo."
       }
     }
 
@@ -360,7 +359,9 @@ for (const duo of Object.values(allDuos)) {
       lastRotationAt: 0,
       lastHeartbeatAt: {},
       lastHeartbeatStats: {},
-      status: "waiting"
+      status: "waiting",
+      offlineReason: null,
+      offlineAt: null
     }
   }
 
@@ -376,13 +377,37 @@ for (const duo of Object.values(allDuos)) {
     joinedAt: rivalNow()
   }
 
-  await saveRivalDuo(duo)
-  await saveRivalDuoIndexes(duo)
+  const saved = await saveRivalDuo(duo)
 
-  if (isRivalDuoFull(duo)) {
+  if (!saved) {
+    return {
+      ok: false,
+      message: "❌ Could not save Rival Duo in Redis."
+    }
+  }
+
+  const reloaded = await getRivalDuoById(duo.id)
+
+  if (!reloaded?.members?.[discordId]) {
+    return {
+      ok: false,
+      message: "❌ Rival Duo was not saved correctly. Try again."
+    }
+  }
+
+  const indexed = await saveRivalDuoIndexes(reloaded)
+
+  if (!indexed) {
+    return {
+      ok: false,
+      message: "❌ Rival Duo was saved, but indexes could not be updated."
+    }
+  }
+
+  if (isRivalDuoFull(reloaded)) {
     return {
       ok: true,
-      message: `✅ Rival Duo completed: **${displayRivalDuoName(duo)}**.`
+      message: `✅ Rival Duo completed: **${displayRivalDuoName(reloaded)}**.`
     }
   }
 
@@ -1732,14 +1757,20 @@ if (interaction.customId === "change_role") {
 
   const openDuos = await findOpenRivalDuos()
 
-  if (!openDuos.length) {
-    const result = await registerRivalDuoMember(pending)
+ if (!openDuos.length) {
+  const result = await registerRivalDuoMember(pending)
 
-    return interaction.reply({
-      content: result.message,
-      flags: MessageFlags.Ephemeral
+  if (result.ok) {
+    await redis.hset(activeRolesKey(), {
+      [interaction.user.id]: "Rival_Duo"
     })
   }
+
+  return interaction.reply({
+    content: result.message,
+    flags: MessageFlags.Ephemeral
+  })
+}
 
   const menu = new StringSelectMenuBuilder()
     .setCustomId(`rival_duo_select_${interaction.user.id}`)
@@ -2028,17 +2059,23 @@ if (interaction.customId === "change_modal") {
 
   const selected = interaction.values[0]
 
-  const result = await registerRivalDuoMember({
-    ...pending,
-    duoId: selected === "create_new" ? null : selected
-  })
+const result = await registerRivalDuoMember({
+  ...pending,
+  duoId: selected === "create_new" ? null : selected
+})
 
-  await clearPendingRivalDuoRegistration(interaction.user.id)
-
-  return interaction.update({
-    content: result.message,
-    components: []
+if (result.ok) {
+  await redis.hset(activeRolesKey(), {
+    [interaction.user.id]: "Rival_Duo"
   })
+}
+
+await clearPendingRivalDuoRegistration(interaction.user.id)
+
+return interaction.update({
+  content: result.message,
+  components: []
+})
 }
       if (interaction.customId.startsWith("gp_group_select:")) {
         if (!isChampion(interaction)) {
