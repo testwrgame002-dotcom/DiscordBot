@@ -237,6 +237,21 @@ async function getRivalDuoByUser(discordId) {
   }
 }
 
+async function getAllRivalDuosByUser(discordId) {
+  const duos = await loadAllRivalDuos()
+  const found = []
+
+  for (const duo of Object.values(duos)) {
+    if (!duo) continue
+
+    if (duo.members && duo.members[String(discordId)]) {
+      found.push(duo)
+    }
+  }
+
+  return found
+}
+
 async function saveRivalDuoIndexes(duo) {
   try {
     for (const member of getRivalDuoMembers(duo)) {
@@ -478,82 +493,67 @@ await saveRivalDuo(duo)
 }
 
 async function setRivalDuoOnline(discordId) {
-  try {
-    const duo = await getRivalDuoByUser(discordId)
+  const duos = await getAllRivalDuosByUser(discordId)
 
-    if (!duo) {
-      return {
-        ok: false,
-        message: "❌ You are not registered in a Rival Duo."
-      }
+  if (!duos.length) {
+    return {
+      ok: false,
+      message: "❌ You are not registered in any Rival Duo."
     }
+  }
 
-    if (!duo.members || typeof duo.members !== "object") {
-      return {
-        ok: false,
-        message: "❌ Rival Duo data is corrupted: missing members."
-      }
-    }
+  const messages = []
 
-    const member = getRivalDuoMember(duo, discordId)
-
-    if (!member) {
-      return {
-        ok: false,
-        message: "❌ Your user was not found inside this Rival Duo."
-      }
-    }
-
-    if (!isValidGameId(member.gameId)) {
-      return {
-        ok: false,
-        message: `❌ Your Rival Duo ID is invalid or missing: ${member.gameId || "None"}`
-      }
-    }
-
-    if (!duo.onlineUsers || typeof duo.onlineUsers !== "object") {
-      duo.onlineUsers = {}
-    }
+  for (const duo of duos) {
+    if (!duo.onlineUsers) duo.onlineUsers = {}
 
     duo.onlineUsers[String(discordId)] = true
 
     await saveRivalDuo(duo)
 
-    return await activateRivalDuoId(duo, false)
-  } catch (err) {
-    console.error("setRivalDuoOnline error:", err)
+    const result = await activateRivalDuoId(duo, false)
 
-    return {
-      ok: false,
-      message: `❌ setRivalDuoOnline error: ${err.message || "Unknown error"}`
-    }
+    messages.push(
+      `🤝 **${displayRivalDuoName(duo)}**\n${result.message}`
+    )
+  }
+
+  return {
+    ok: true,
+    message: messages.join("\n\n")
   }
 }
 
 async function setRivalDuoOffline(discordId, reason = "offline") {
-  const duo = await getRivalDuoByUser(discordId)
+  const duos = await getAllRivalDuosByUser(discordId)
 
-  if (!duo) {
+  if (!duos.length) {
     return {
       ok: false,
-      message: "❌ You are not registered in a Rival Duo."
+      message: "❌ You are not registered in any Rival Duo."
     }
   }
 
-  await removeRivalDuoIdsFromElite(duo)
+  const messages = []
 
-  duo.onlineUsers = {}
-  duo.activeGameId = null
-  duo.activeDiscordId = null
-  duo.status = "offline"
-  duo.offlineReason = reason
-  duo.offlineAt = rivalNow()
+  for (const duo of duos) {
+    await removeRivalDuoIdsFromElite(duo)
 
-  await saveRivalDuo(duo)
+    duo.onlineUsers = {}
+    duo.activeGameId = null
+    duo.activeDiscordId = null
+    duo.status = "offline"
+    duo.offlineReason = reason
+    duo.offlineAt = rivalNow()
+
+    await saveRivalDuo(duo)
+
+    messages.push(`🔴 Rival Duo offline: **${displayRivalDuoName(duo)}**.`)
+  }
 
   return {
     ok: true,
-    message: `🔴 Rival Duo offline: **${displayRivalDuoName(duo)}**.`
+    message: messages.join("\n")
   }
 }
 
