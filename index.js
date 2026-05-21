@@ -317,14 +317,18 @@ async function registerRivalDuoMember({
     }
   }
 
-  const existing = await getRivalDuoByUser(discordId)
+const allDuos = await loadAllRivalDuos()
 
-  if (existing) {
+for (const duo of Object.values(allDuos)) {
+  if (!duo || !duo.members) continue
+
+  if (duo.id === duoId && duo.members[discordId]) {
     return {
       ok: false,
-      message: "❌ You are already registered in a Rival Duo."
+      message: "❌ You are already registered in this Rival Duo."
     }
   }
+}
 
   let duo = null
 
