@@ -505,7 +505,9 @@ async function setRivalDuoOnline(discordId) {
   const messages = []
 
   for (const duo of duos) {
-    if (!duo.onlineUsers) duo.onlineUsers = {}
+    if (!duo.onlineUsers || typeof duo.onlineUsers !== "object") {
+      duo.onlineUsers = {}
+    }
 
     duo.onlineUsers[String(discordId)] = true
 
