@@ -386,17 +386,18 @@ async function registerRivalDuoMember({
     }
   }
 
-  duo.members[discordId] = {
-    discordId,
-    name: name || "Unknown",
-    heartbeatName: heartbeatName || name || "Unknown",
-    gameId,
-aliases: uniqueList([
-  name,
-  heartbeatName
-]),
+duo.members[discordId] = {
+  discordId,
+  name: name || "Unknown",
+  heartbeatName: heartbeatName || name || "Unknown",
+  gameId,
+  aliases: uniqueList([
+    name,
+    heartbeatName
+  ])
+}
 
-  const saved = await saveRivalDuo(duo)
+const saved = await saveRivalDuo(duo)
 
   if (!saved) {
     return {
