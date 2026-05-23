@@ -1648,6 +1648,25 @@ if (interaction.customId === "online_list") {
     }
   }
 
+  const rivalDuos = await loadAllRivalDuos()
+
+for (const duo of Object.values(rivalDuos)) {
+  if (!duo) continue
+
+  const members = getRivalDuoMembers(duo)
+
+  for (const member of members) {
+    const gameId = String(member.gameId || "").trim()
+
+    if (!gameId) continue
+    if (!ids.includes(gameId)) continue
+
+    msg += `🤝 ${member.name || "Unknown"} | 📡 ${member.heartbeatName || member.name || "Unknown"} → Rival Duo: ${gameId}\n`
+
+    found = true
+  }
+}
+
   if (!found) msg += "⚫ No registered users online\n"
 
   return interaction.editReply(msg)
