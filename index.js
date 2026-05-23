@@ -86,19 +86,35 @@ function uniqueList(arr) {
 }
 
 function buildUserData(oldData, interaction, updates = {}) {
+
   const discordName =
     interaction.member?.displayName ||
     interaction.user?.username ||
     "Unknown"
 
-  const oldAliases = Array.isArray(oldData.aliases) ? oldData.aliases : []
+  const oldAliases = Array.isArray(oldData.aliases)
+    ? oldData.aliases
+    : []
 
-  const name = oldData.name || discordName
+  const finalMainId =
+    updates.main_id !== undefined
+      ? updates.main_id
+      : oldData.main_id || null
 
-  const heartbeatName =
-    oldData.heartbeatName ||
+  const finalSecId =
+    updates.sec_id !== undefined
+      ? updates.sec_id
+      : oldData.sec_id || null
+
+  const name =
+    updates.name ||
     oldData.name ||
     discordName
+
+  const heartbeatName =
+    updates.heartbeatName ||
+    oldData.heartbeatName ||
+    name
 
   const aliases = uniqueList([
     ...oldAliases,
@@ -111,9 +127,14 @@ function buildUserData(oldData, interaction, updates = {}) {
 
   return {
     ...oldData,
+
     name,
     heartbeatName,
     aliases,
+
+    main_id: finalMainId,
+    sec_id: finalSecId,
+
     ...updates
   }
 }
@@ -370,12 +391,10 @@ async function registerRivalDuoMember({
     name: name || "Unknown",
     heartbeatName: heartbeatName || name || "Unknown",
     gameId,
-    aliases: [
-      name,
-      heartbeatName
-    ].filter(Boolean),
-    joinedAt: rivalNow()
-  }
+aliases: uniqueList([
+  name,
+  heartbeatName
+]),
 
   const saved = await saveRivalDuo(duo)
 
