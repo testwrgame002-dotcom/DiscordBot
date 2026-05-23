@@ -1812,32 +1812,25 @@ if (interaction.customId === "change_role") {
   })
 }
 
-      if (interaction.customId === "change_modal") {
+if (interaction.customId === "change_modal") {
   if (await isActiveRivalDuo(interaction)) {
-  const id = interaction.fields.getTextInputValue("id").trim()
+    const id = interaction.fields.getTextInputValue("id").trim()
 
-  if (!isValidId(id)) {
+    if (!isValidId(id)) {
+      return interaction.reply({
+        content: "❌ ID must be exactly 16 digits",
+        flags: MessageFlags.Ephemeral
+      })
+    }
+
+    const result = await changeRivalDuoGameId(interaction.user.id, id)
+
     return interaction.reply({
-      content: "❌ ID must be exactly 16 digits",
+      content: result.message,
       flags: MessageFlags.Ephemeral
     })
   }
-
-  const result = await changeRivalDuoGameId(interaction.user.id, id)
-
-  return interaction.reply({
-    content: result.message,
-    flags: MessageFlags.Ephemeral
-  })
 }
-}    
-      const group = await getUserGroup(interaction)
-      if (!group) {
-        return interaction.reply({
-          content: "❌ No group",
-          flags: MessageFlags.Ephemeral
-        })
-      }
 
       const config = GROUP_CONFIG[group]
       const users = await getUsers(group)
