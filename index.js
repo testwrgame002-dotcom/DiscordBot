@@ -1038,6 +1038,8 @@ async function setOnlineStatus(action, id, group) {
 
     const key = onlineKey(group)
 
+    id = String(id).trim()
+
     if (action === "online") {
       await redis.sadd(key, id)
     }
@@ -1634,8 +1636,15 @@ if (interaction.customId === "online_list") {
     const mainId = String(u.main_id || "").trim()
     const secId = String(u.sec_id || "").trim()
 
-    const mainOnline = mainId && ids.includes(mainId)
-    const secOnline = secId && ids.includes(secId)
+const normalizedIds = ids.map(id => String(id).trim())
+
+const mainOnline =
+  mainId &&
+  normalizedIds.includes(String(mainId).trim())
+
+const secOnline =
+  secId &&
+  normalizedIds.includes(String(secId).trim())
 
     if (mainOnline || secOnline) {
       const shownIds = []
@@ -1659,7 +1668,10 @@ for (const duo of Object.values(rivalDuos)) {
     const gameId = String(member.gameId || "").trim()
 
     if (!gameId) continue
-    if (!ids.includes(gameId)) continue
+
+if (!normalizedIds.includes(String(gameId).trim())) {
+  continue
+}
 
     msg += `🤝 ${member.name || "Unknown"} | 📡 ${member.heartbeatName || member.name || "Unknown"} → Rival Duo: ${gameId}\n`
 
@@ -2153,7 +2165,10 @@ return interaction.update({
 
         for (const uid in users) {
           const u = users[uid]
-          const matchedId = ids.find(id => id === u.main_id || id === u.sec_id)
+          const matchedId = ids.find(id =>
+  String(id).trim() === String(u.main_id || "").trim() ||
+  String(id).trim() === String(u.sec_id || "").trim()
+)
 
           if (matchedId) {
             onlineOptions.push({
