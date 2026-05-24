@@ -2089,6 +2089,7 @@ if (interaction.customId === "change_modal") {
     components: [new ActionRowBuilder().addComponents(menu)],
     flags: MessageFlags.Ephemeral
   })
+     }
 
 
     
