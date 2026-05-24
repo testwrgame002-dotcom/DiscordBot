@@ -220,9 +220,9 @@ async function saveRivalDuo(duo) {
   try {
     if (!duo?.id) return false
 
-    await redis.hset(RIVAL_DUOS_KEY, {
-      [duo.id]: JSON.stringify(duo)
-    })
+ await redis.hset(RIVAL_DUOS_KEY, {
+  [duo.id]: JSON.stringify(duo)
+})
 
     return true
   } catch (err) {
