@@ -1794,62 +1794,67 @@ if (interaction.isModalSubmit()) {
     })
   }
 
-  const gameId = interaction.fields.getTextInputValue("game_id").trim()
-  const heartbeatName = interaction.fields.getTextInputValue("heartbeat_name").trim()
+  // ================= RIVAL DUO REGISTER =================
 
-  if (!isValidGameId(gameId)) {
+  if (interaction.customId === "rival_duo_register_modal") {
+
+    const gameId = interaction.fields.getTextInputValue("game_id").trim()
+    const heartbeatName = interaction.fields.getTextInputValue("heartbeat_name").trim()
+
+    if (!isValidGameId(gameId)) {
+      return interaction.reply({
+        content: "❌ The ID must be exactly 16 digits.",
+        flags: MessageFlags.Ephemeral
+      })
+    }
+
+    const pending = {
+      discordId: interaction.user.id,
+      name: interaction.member?.displayName || interaction.user.username,
+      heartbeatName,
+      gameId
+    }
+
+    await savePendingRivalDuoRegistration(interaction.user.id, pending)
+
+    const openDuos = await findOpenRivalDuos()
+
+    if (!openDuos.length) {
+
+      const result = await registerRivalDuoMember(pending)
+
+      if (result.ok) {
+        await redis.hset(activeRolesKey(), {
+          [interaction.user.id]: "Rival_Duo"
+        })
+      }
+
+      return interaction.reply({
+        content: result.message,
+        flags: MessageFlags.Ephemeral
+      })
+    }
+
+    const menu = new StringSelectMenuBuilder()
+      .setCustomId(`rival_duo_select_${interaction.user.id}`)
+      .setPlaceholder("Select open Duo or create new")
+      .addOptions([
+        {
+          label: "Create new Rival Duo",
+          value: "create_new"
+        },
+        ...openDuos.slice(0, 24).map(duo => ({
+          label: displayRivalDuoName(duo).slice(0, 100),
+          value: duo.id
+        }))
+      ])
+
     return interaction.reply({
-      content: "❌ The ID must be exactly 16 digits.",
+      content: "There are open Rival Duo registrations. Select one or create a new Duo.",
+      components: [new ActionRowBuilder().addComponents(menu)],
       flags: MessageFlags.Ephemeral
     })
   }
-
-  const pending = {
-    discordId: interaction.user.id,
-    name: interaction.member?.displayName || interaction.user.username,
-    heartbeatName,
-    gameId
-  }
-
-  await savePendingRivalDuoRegistration(interaction.user.id, pending)
-
-  const openDuos = await findOpenRivalDuos()
-
- if (!openDuos.length) {
-  const result = await registerRivalDuoMember(pending)
-
-  if (result.ok) {
-    await redis.hset(activeRolesKey(), {
-      [interaction.user.id]: "Rival_Duo"
-    })
-  }
-
-  return interaction.reply({
-    content: result.message,
-    flags: MessageFlags.Ephemeral
-  })
-}
-
-  const menu = new StringSelectMenuBuilder()
-    .setCustomId(`rival_duo_select_${interaction.user.id}`)
-    .setPlaceholder("Select open Duo or create new")
-    .addOptions([
-      {
-        label: "Create new Rival Duo",
-        value: "create_new"
-      },
-      ...openDuos.slice(0, 24).map(duo => ({
-        label: displayRivalDuoName(duo).slice(0, 100),
-        value: duo.id
-      }))
-    ])
-
-  return interaction.reply({
-    content: "There are open Rival Duo registrations. Select one or create a new Duo.",
-    components: [new ActionRowBuilder().addComponents(menu)],
-    flags: MessageFlags.Ephemeral
-  })
-}
 
 if (interaction.customId === "change_modal") {
   if (await isActiveRivalDuo(interaction)) {
