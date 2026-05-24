@@ -998,8 +998,6 @@ async function saveUsers(users, group) {
 
     const key = usersKey(group)
 
-    await redis.del(key)
-
     const payload = {}
 
     for (const uid in users) {
