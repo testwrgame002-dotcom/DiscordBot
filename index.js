@@ -2172,21 +2172,25 @@ return interaction.update({
 
         const onlineOptions = []
 
-        for (const uid in users) {
-          const u = users[uid]
-          const matchedId = ids.find(id =>
-  String(id).trim() === String(u.main_id || "").trim() ||
-  String(id).trim() === String(u.sec_id || "").trim()
-)
+  for (const uid in users) {
+  const u = users[uid]
 
-          if (matchedId) {
-            onlineOptions.push({
-              label: u.name || `User ${uid}`,
-              value: `${group}|${matchedId}`,
-              description: matchedId === u.main_id ? "Main ID online" : "Secondary ID online"
-            })
-          }
-        }
+  const matchedId = ids.find(id =>
+    String(id).trim() === String(u.main_id || "").trim() ||
+    String(id).trim() === String(u.sec_id || "").trim()
+  )
+
+  if (matchedId) {
+    onlineOptions.push({
+      label: u.name || `User ${uid}`,
+      value: `${group}|${matchedId}`,
+      description:
+        matchedId === u.main_id
+          ? "Main ID online"
+          : "Secondary ID online"
+    })
+  }
+}
 
         if (!onlineOptions.length) {
           const fallbackOptions = ids.slice(0, 25).map(id => ({
