@@ -1778,14 +1778,18 @@ if (interaction.customId === "change_role") {
     }
 
     // ================= MODALES =================
-    if (interaction.isModalSubmit()) {
+// ================= MODALES =================
+if (interaction.isModalSubmit()) {
 
-      if (interaction.customId === "rival_duo_register_modal") {
-  const hasRole = interaction.member.roles.cache.some(r => r.name === "Rival_Duo")
+  const group = await getUserGroup(interaction)
 
-  if (!hasRole) {
+  if (
+    interaction.customId !== "rival_duo_register_modal" &&
+    interaction.customId !== "gp_modal" &&
+    !group
+  ) {
     return interaction.reply({
-      content: "❌ You need the Rival_Duo role to register here.",
+      content: "❌ No group",
       flags: MessageFlags.Ephemeral
     })
   }
