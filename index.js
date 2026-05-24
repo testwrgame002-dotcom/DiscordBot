@@ -2085,6 +2085,8 @@ if (interaction.customId === "change_modal") {
     flags: MessageFlags.Ephemeral
   })
 }
+  }
+
     }
 
     // ================= SELECT MENUS =================
