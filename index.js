@@ -1625,7 +1625,11 @@ if (interaction.customId === "online_list") {
   const users = await getUsers(group)
   const ids = await getOnlineIDs(group)
 
-  if (!ids.length) return interaction.editReply("⚫ No online")
+  const normalizedIds = ids.map(id => String(id).trim())
+
+  if (!normalizedIds.length) {
+    return interaction.editReply("⚫ No online")
+  }
 
   let msg = "🟢 Online:\n\n"
   let found = false
@@ -1636,15 +1640,13 @@ if (interaction.customId === "online_list") {
     const mainId = String(u.main_id || "").trim()
     const secId = String(u.sec_id || "").trim()
 
-const normalizedIds = ids.map(id => String(id).trim())
+    const mainOnline =
+      mainId &&
+      normalizedIds.includes(mainId)
 
-const mainOnline =
-  mainId &&
-  normalizedIds.includes(String(mainId).trim())
-
-const secOnline =
-  secId &&
-  normalizedIds.includes(String(secId).trim())
+    const secOnline =
+      secId &&
+      normalizedIds.includes(secId)
 
     if (mainOnline || secOnline) {
       const shownIds = []
@@ -1653,33 +1655,36 @@ const secOnline =
       if (secOnline) shownIds.push(`Sec: ${secId}`)
 
       msg += `👤 ${u.name} | 📡 ${u.heartbeatName || u.name} → ${shownIds.join(" | ")}\n`
+
       found = true
     }
   }
 
   const rivalDuos = await loadAllRivalDuos()
 
-for (const duo of Object.values(rivalDuos)) {
-  if (!duo) continue
+  for (const duo of Object.values(rivalDuos)) {
+    if (!duo) continue
 
-  const members = getRivalDuoMembers(duo)
+    const members = getRivalDuoMembers(duo)
 
-  for (const member of members) {
-    const gameId = String(member.gameId || "").trim()
+    for (const member of members) {
+      const gameId = String(member.gameId || "").trim()
 
-    if (!gameId) continue
+      if (!gameId) continue
 
-if (!normalizedIds.includes(String(gameId).trim())) {
-  continue
-}
+      if (!normalizedIds.includes(gameId)) {
+        continue
+      }
 
-    msg += `🤝 ${member.name || "Unknown"} | 📡 ${member.heartbeatName || member.name || "Unknown"} → Rival Duo: ${gameId}\n`
+      msg += `🤝 ${member.name || "Unknown"} | 📡 ${member.heartbeatName || member.name || "Unknown"} → Rival Duo: ${gameId}\n`
 
-    found = true
+      found = true
+    }
   }
-}
 
-  if (!found) msg += "⚫ No registered users online\n"
+  if (!found) {
+    msg += "⚫ No registered users online\n"
+  }
 
   return interaction.editReply(msg)
 }
