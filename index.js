@@ -936,21 +936,17 @@ async function isGameIdAlreadyUsed(id) {
 
 async function getActiveRoles(userId) {
   try {
-    const key = `active_roles:${userId}`;
+    const role = await redis.hget(
+      activeRolesKey(),
+      String(userId)
+    )
 
-    const keyType = await redis.type(key);
+    if (!role) return null
 
-    if (keyType !== "string" && keyType !== "none") {
-      console.log(`⚠️ Deleting invalid key type for ${key}: ${keyType}`);
-      await redis.del(key);
-      return null;
-    }
-
-    return await redis.get(key);
-
+    return role
   } catch (error) {
-    console.error("Error loading active roles:", error);
-    return null;
+    console.error("Error loading active role:", error)
+    return null
   }
 }
 
@@ -1150,29 +1146,60 @@ async function addVipID(id, group) {
 
 // ===== GROUP =====
 async function getUserGroup(interaction) {
-const savedRole = await getActiveRoles(interaction.user.id);
 
-const memberGroups = getMemberSelectableRoles(interaction.member);
+  const memberGroups = getMemberSelectableRoles(interaction.member)
 
-if (!memberGroups.length) return null;
+  if (!memberGroups.length) return null
 
-  if (savedRole && memberGroups.includes(savedRole)) {
-    return savedRole;
+  const savedRole = await getActiveRoles(interaction.user.id)
+
+  if (savedRole) {
+
+    const normalizedSavedRole = savedRole
+      .toLowerCase()
+      .replace(/_/g, " ")
+      .trim()
+
+    const hasRole = interaction.member.roles.cache.some(role =>
+      role.name
+        .toLowerCase()
+        .replace(/_/g, " ")
+        .trim() === normalizedSavedRole
+    )
+
+    if (hasRole) {
+      const matchedRole = interaction.member.roles.cache.find(role =>
+        role.name
+          .toLowerCase()
+          .replace(/_/g, " ")
+          .trim() === normalizedSavedRole
+      )
+
+      return matchedRole
+        ? normalizeSelectableRoleName(matchedRole.name)
+        : null
+    }
   }
 
   const priority = [
-  "Elite_Four",
-  "Gym_Leader",
-  "Trainer"
-]
+    "Rival_Duo",
+    "Elite_Four",
+    "Gym_Leader",
+    "Trainer"
+  ]
 
-for (const role of priority) {
-  if (memberGroups.includes(role)) {
-    return role
+  for (const role of priority) {
+    if (memberGroups.includes(role)) {
+
+      await redis.hset(activeRolesKey(), {
+        [interaction.user.id]: role
+      })
+
+      return role
+    }
   }
-}
 
-return null
+  return null
 }
 async function isActiveRivalDuo(interaction) {
 const selected = await getActiveRoles(interaction.user.id)
@@ -1815,8 +1842,9 @@ if (interaction.customId === "change_role") {
     return interaction.editReply("❌ You need at least 2 group roles to switch.")
   }
 
-  const activeRoles = await getActiveRoles()
-  const currentRole = activeRoles[interaction.user.id] || await getUserGroup(interaction)
+const currentRole =
+  await getActiveRoles(interaction.user.id) ||
+  await getUserGroup(interaction)
 
   const roles = memberGroups.map(group => ({
     label: getSelectableRoleLabel(group),
