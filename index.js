@@ -141,8 +141,8 @@ function buildUserData(oldData, interaction, updates = {}) {
 // ================= RIVAL DUO SYSTEM =================
 
 const RIVAL_DUOS_KEY = "rival_duos"
-const RIVAL_DUO_BY_USER_KEY = "rival_duo_by_user"
-const RIVAL_DUO_BY_GAMEID_KEY = "rival_duo_by_gameid"
+//const RIVAL_DUO_BY_USER_KEY = "rival_duo_by_user"
+//const RIVAL_DUO_BY_GAMEID_KEY = "rival_duo_by_gameid"
 //const RIVAL_DUO_ROTATION_MS = 2 * 60 * 1000
 const RIVAL_DUO_ROTATION_MS = 60 * 60 * 1000
 
@@ -242,20 +242,17 @@ async function getRivalDuoById(duoId) {
 }
 
 async function getRivalDuoByUser(discordId) {
-  try {
-    const raw = await redis.hget(RIVAL_DUO_BY_USER_KEY, String(discordId))
+  const duos = await loadAllRivalDuos()
 
-    if (!raw) return null
+  for (const duo of Object.values(duos)) {
+    if (!duo?.members) continue
 
-    const ref = parseRivalJson(raw, null)
-
-    if (!ref?.duoId) return null
-
-    return await getRivalDuoById(ref.duoId)
-  } catch (err) {
-    console.error("Error loading rival duo by user:", err)
-    return null
+    if (duo.members[String(discordId)]) {
+      return duo
+    }
   }
+
+  return null
 }
 
 async function getAllRivalDuosByUser(discordId) {
@@ -273,30 +270,7 @@ async function getAllRivalDuosByUser(discordId) {
   return found
 }
 
-async function saveRivalDuoIndexes(duo) {
-  try {
-    for (const member of getRivalDuoMembers(duo)) {
-      await redis.hset(RIVAL_DUO_BY_USER_KEY, {
-        [member.discordId]: JSON.stringify({
-          duoId: duo.id,
-          discordId: member.discordId
-        })
-      })
 
-      await redis.hset(RIVAL_DUO_BY_GAMEID_KEY, {
-        [member.gameId]: JSON.stringify({
-          duoId: duo.id,
-          discordId: member.discordId
-        })
-      })
-    }
-
-    return true
-  } catch (err) {
-    console.error("Error saving rival duo indexes:", err)
-    return false
-  }
-}
 
 async function findOpenRivalDuos() {
   const duos = await loadAllRivalDuos()
@@ -415,7 +389,6 @@ const saved = await saveRivalDuo(duo)
     }
   }
 
-  const indexed = await saveRivalDuoIndexes(reloaded)
 
   if (!indexed) {
     return {
@@ -466,9 +439,11 @@ async function activateRivalDuoId(duo, force = false) {
     }
   }
 
-  const bothOnline = members.every(member => {
-    return duo.onlineUsers?.[member.discordId] === true
-  })
+const onlineMembers = members.filter(member =>
+  duo.onlineUsers?.[member.discordId] === true
+)
+
+const bothOnline = onlineMembers.length >= 2
 
   if (!bothOnline) {
     await removeRivalDuoIdsFromElite(duo)
@@ -601,7 +576,11 @@ async function setRivalDuoOffline(discordId, reason = "offline") {
 
     await removeRivalDuoIdsFromElite(duo)
 
-    duo.onlineUsers = {}
+    if (!duo.onlineUsers) {
+  duo.onlineUsers = {}
+}
+
+duo.onlineUsers[discordId] = false
     duo.activeGameId = null
     duo.activeDiscordId = null
     duo.status = "offline"
@@ -709,8 +688,8 @@ if (oldGameId && isValidGameId(oldGameId)) {
   }
 
   await saveRivalDuo(duo)
-  await saveRivalDuoIndexes(duo)
 
+  
   return {
     ok: true,
     message:
@@ -737,9 +716,11 @@ function getRivalDuoStatusLabel(duo) {
 
   if (members.length < 2) return "⏳ Waiting Partner"
 
-  const bothOnline = members.every(member => {
-    return duo.onlineUsers?.[member.discordId] === true
-  })
+const onlineMembers = members.filter(member =>
+  duo.onlineUsers?.[member.discordId] === true
+)
+
+const bothOnline = onlineMembers.length >= 2
 
   if (duo.status === "online" && bothOnline && duo.activeGameId) {
     return "🟢 Online"
@@ -989,6 +970,22 @@ async function getUsers(group) {
   }
 }
 
+async function findUserRegistration(discordId) {
+  for (const group of Object.keys(GROUP_CONFIG)) {
+    const users = await getUsers(group)
+
+    if (users[discordId]) {
+      return {
+        group,
+        userData: users[discordId],
+        users
+      }
+    }
+  }
+
+  return null
+}
+
 async function saveUsers(users, group) {
   try {
     if (!GROUP_CONFIG[group]) {
@@ -1017,7 +1014,9 @@ async function saveUsers(users, group) {
 
 async function setOnlineStatus(action, id, group) {
   try {
-    id = String(id || "").trim()
+    id = String(id || "")
+  .replace(/\s+/g, "")
+  .trim()
 
     if (!["online", "offline"].includes(action)) {
       console.error("Invalid action:", action)
@@ -1043,7 +1042,11 @@ async function setOnlineStatus(action, id, group) {
     }
 
     if (action === "offline") {
-      await redis.srem(key, id)
+     const removed = await redis.srem(key, id)
+
+if (removed === 0) {
+  console.warn(`ID was not online: ${id} in ${group}`)
+}
     }
 
     return true
@@ -1548,8 +1551,13 @@ if (!isModalButton && !interaction.deferred && !interaction.replied) {
 
 if (interaction.customId === "online") {
 
-  const users = await getUsers(group)
-  const userData = users[interaction.user.id]
+const found = await findUserRegistration(interaction.user.id)
+
+if (!found) {
+  return interaction.editReply("❌ Register first")
+}
+
+const { group, users, userData } = found
 
   if (!userData?.main_id) return interaction.editReply("❌ Register first")
 
@@ -1563,8 +1571,13 @@ if (interaction.customId === "online") {
 }
 
       if (interaction.customId === "online_sec") {
-        const users = await getUsers(group)
-        const userData = users[interaction.user.id]
+const found = await findUserRegistration(interaction.user.id)
+
+if (!found) {
+  return interaction.editReply("❌ Register first")
+}
+
+const { group, users, userData } = found
 
         if (!userData?.sec_id) return interaction.editReply("❌ No secondary ID")
 
@@ -1579,8 +1592,13 @@ return interaction.editReply("🟢 SEC ONLINE. It now appears in Online List.")
 
 if (interaction.customId === "offline") {
 
-  const users = await getUsers(group)
-  const userData = users[interaction.user.id]
+const found = await findUserRegistration(interaction.user.id)
+
+if (!found) {
+  return interaction.editReply("❌ Register first")
+}
+
+const { group, users, userData } = found
 
   if (!userData) return interaction.editReply("❌ Not registered")
 
