@@ -934,13 +934,23 @@ async function isGameIdAlreadyUsed(id) {
   return false
 }
 
-async function getActiveRoles() {
+async function getActiveRoles(userId) {
   try {
-    const raw = await redis.get(activeRolesKey())
-    return safeJsonParse(raw, {})
-  } catch (err) {
-    console.error("Error loading active roles:", err)
-    return {}
+    const key = `active_roles:${userId}`;
+
+    const keyType = await redis.type(key);
+
+    if (keyType !== "string" && keyType !== "none") {
+      console.log(`⚠️ Deleting invalid key type for ${key}: ${keyType}`);
+      await redis.del(key);
+      return null;
+    }
+
+    return await redis.get(key);
+
+  } catch (error) {
+    console.error("Error loading active roles:", error);
+    return null;
   }
 }
 
@@ -1140,13 +1150,11 @@ async function addVipID(id, group) {
 
 // ===== GROUP =====
 async function getUserGroup(interaction) {
-  const activeRoles = await getActiveRoles();
+const savedRole = await getActiveRoles(interaction.user.id);
 
-  const memberGroups = getMemberGroups(interaction.member);
+const memberGroups = getMemberSelectableRoles(interaction.member);
 
-  if (!memberGroups.length) return null;
-
-  const savedRole = activeRoles[interaction.user.id];
+if (!memberGroups.length) return null;
 
   if (savedRole && memberGroups.includes(savedRole)) {
     return savedRole;
@@ -1167,8 +1175,7 @@ for (const role of priority) {
 return null
 }
 async function isActiveRivalDuo(interaction) {
-  const activeRoles = await getActiveRoles()
-  const selected = activeRoles[interaction.user.id]
+const selected = await getActiveRoles(interaction.user.id)
 
   const hasRivalDuoRole = interaction.member.roles.cache.some(role =>
     role.name === "Rival_Duo" || role.name === "Rival Duo"
