@@ -823,6 +823,9 @@ const GROUP_CONFIG = {
   },
   Elite_Four: {
     label: "Elite Four"
+  },
+  Rival_Duo: {
+  label: "Rival Duo"
   }
 }
 
@@ -994,8 +997,27 @@ async function getUsers(group) {
   }
 }
 
-async function findUserRegistration(discordId) {
+async function findUserRegistration(discordId, preferredGroup = null) {
+
+  // SI HAY GRUPO PREFERIDO → USAR SOLO ESE
+  if (preferredGroup && GROUP_CONFIG[preferredGroup]) {
+
+    const users = await getUsers(preferredGroup)
+
+    if (users[discordId]) {
+      return {
+        group: preferredGroup,
+        userData: users[discordId],
+        users
+      }
+    }
+
+    return null
+  }
+
+  // FALLBACK
   for (const group of Object.keys(GROUP_CONFIG)) {
+
     const users = await getUsers(group)
 
     if (users[discordId]) {
@@ -1130,7 +1152,19 @@ async function getUserGroup(interaction) {
     return savedRole;
   }
 
-  return memberGroups[0];
+  const priority = [
+  "Elite_Four",
+  "Gym_Leader",
+  "Trainer"
+]
+
+for (const role of priority) {
+  if (memberGroups.includes(role)) {
+    return role
+  }
+}
+
+return null
 }
 async function isActiveRivalDuo(interaction) {
   const activeRoles = await getActiveRoles()
@@ -1575,7 +1609,12 @@ if (!isModalButton && !interaction.deferred && !interaction.replied) {
 
 if (interaction.customId === "online") {
 
-const found = await findUserRegistration(interaction.user.id)
+const activeGroup = await getUserGroup(interaction)
+
+const found = await findUserRegistration(
+  interaction.user.id,
+  activeGroup
+)
 
 if (!found) {
   return interaction.editReply("❌ Register first")
@@ -1595,7 +1634,12 @@ const { group, users, userData } = found
 }
 
       if (interaction.customId === "online_sec") {
-const found = await findUserRegistration(interaction.user.id)
+const activeGroup = await getUserGroup(interaction)
+
+const found = await findUserRegistration(
+  interaction.user.id,
+  activeGroup
+)
 
 if (!found) {
   return interaction.editReply("❌ Register first")
@@ -1616,7 +1660,12 @@ return interaction.editReply("🟢 SEC ONLINE. It now appears in Online List.")
 
 if (interaction.customId === "offline") {
 
-const found = await findUserRegistration(interaction.user.id)
+const activeGroup = await getUserGroup(interaction)
+
+const found = await findUserRegistration(
+  interaction.user.id,
+  activeGroup
+)
 
 if (!found) {
   return interaction.editReply("❌ Register first")
