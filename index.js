@@ -896,32 +896,56 @@ function isValidId(id) {
   return /^\d{16}$/.test(String(id).trim())
 }
 
+async function isGameIdAlreadyUsed(id) {
+  id = String(id).trim()
+
+  // usuarios normales
+  for (const group of Object.keys(GROUP_CONFIG)) {
+    const users = await getUsers(group)
+
+    for (const uid in users) {
+      const u = users[uid]
+
+      if (
+        String(u.main_id || "").trim() === id ||
+        String(u.sec_id || "").trim() === id
+      ) {
+        return true
+      }
+    }
+  }
+
+  // rival duos
+  const duos = await loadAllRivalDuos()
+
+  for (const duo of Object.values(duos)) {
+    const members = getRivalDuoMembers(duo)
+
+    for (const member of members) {
+      if (String(member.gameId || "").trim() === id) {
+        return true
+      }
+    }
+  }
+
+  return false
+}
+
 async function getActiveRoles() {
   try {
-    const data = await redis.hgetall(activeRolesKey())
-
-    if (!data || typeof data !== "object") {
-      return {}
-    }
-
-    return data
+    const raw = await redis.get(activeRolesKey())
+    return safeJsonParse(raw, {})
   } catch (err) {
-    console.error("Error loading active roles from Redis:", err)
+    console.error("Error loading active roles:", err)
     return {}
   }
 }
 
 async function saveActiveRoles(data) {
   try {
-    if (!data || typeof data !== "object") return
-
-    await redis.del(activeRolesKey())
-
-    if (Object.keys(data).length > 0) {
-      await redis.hset(activeRolesKey(), data)
-    }
+    await redis.set(activeRolesKey(), JSON.stringify(data || {}))
   } catch (err) {
-    console.error("Error saving active roles to Redis:", err)
+    console.error("Error saving active roles:", err)
   }
 }
 
@@ -1826,6 +1850,15 @@ if (interaction.isModalSubmit()) {
       })
     }
 
+    const alreadyUsed = await isGameIdAlreadyUsed(gameId)
+
+if (alreadyUsed) {
+  return interaction.reply({
+    content: "❌ This ID is already registered.",
+    flags: MessageFlags.Ephemeral
+  })
+}
+
     const pending = {
       discordId: interaction.user.id,
       name: interaction.member?.displayName || interaction.user.username,
@@ -1906,6 +1939,14 @@ if (interaction.customId === "change_modal") {
             flags: MessageFlags.Ephemeral
           })
         }
+        const alreadyUsed = await isGameIdAlreadyUsed(id)
+
+if (alreadyUsed) {
+  return interaction.reply({
+    content: "❌ This ID is already registered by another user.",
+    flags: MessageFlags.Ephemeral
+  })
+}
 
 const oldData = users[interaction.user.id] || {}
 
@@ -1933,6 +1974,14 @@ await saveUsers(users, group)
             flags: MessageFlags.Ephemeral
           })
         }
+        const alreadyUsed = await isGameIdAlreadyUsed(id)
+
+if (alreadyUsed) {
+  return interaction.reply({
+    content: "❌ This ID is already registered by another user.",
+    flags: MessageFlags.Ephemeral
+  })
+}
 
         if (!users[interaction.user.id]) {
           return interaction.reply({
@@ -1961,7 +2010,14 @@ if (interaction.customId === "change_modal") {
       flags: MessageFlags.Ephemeral
     })
   }
+const alreadyUsed = await isGameIdAlreadyUsed(id)
 
+if (alreadyUsed) {
+  return interaction.reply({
+    content: "❌ This ID is already registered by another user.",
+    flags: MessageFlags.Ephemeral
+  })
+}
 
   if (!users[interaction.user.id]) {
     return interaction.reply({
