@@ -936,16 +936,25 @@ async function isGameIdAlreadyUsed(id) {
 
 async function getActiveRoles(userId) {
   try {
-    const role = await redis.hget(
-      activeRolesKey(),
-      String(userId)
-    )
 
-    if (!role) return null
+    // formato nuevo
+    let role = await redis.get(`active_roles:${userId}`)
 
-    return role
+    if (role) {
+      return role
+    }
+
+    // fallback viejo
+    const oldRoles = await redis.hgetall(activeRolesKey())
+
+    if (oldRoles && typeof oldRoles === "object") {
+      return oldRoles[userId] || null
+    }
+
+    return null
+
   } catch (error) {
-    console.error("Error loading active role:", error)
+    console.error("Error loading active roles:", error)
     return null
   }
 }
@@ -1149,38 +1158,35 @@ async function getUserGroup(interaction) {
 
   const memberGroups = getMemberSelectableRoles(interaction.member)
 
-  if (!memberGroups.length) return null
+  if (!memberGroups.length) {
+    return null
+  }
 
-  const savedRole = await getActiveRoles(interaction.user.id)
+  // intentar formato NUEVO
+  let savedRole = await redis.get(`active_roles:${interaction.user.id}`)
 
-  if (savedRole) {
+  // fallback formato VIEJO HASH
+  if (!savedRole) {
+    try {
+      const oldRoles = await redis.hgetall(activeRolesKey())
 
-    const normalizedSavedRole = savedRole
-      .toLowerCase()
-      .replace(/_/g, " ")
-      .trim()
-
-    const hasRole = interaction.member.roles.cache.some(role =>
-      role.name
-        .toLowerCase()
-        .replace(/_/g, " ")
-        .trim() === normalizedSavedRole
-    )
-
-    if (hasRole) {
-      const matchedRole = interaction.member.roles.cache.find(role =>
-        role.name
-          .toLowerCase()
-          .replace(/_/g, " ")
-          .trim() === normalizedSavedRole
-      )
-
-      return matchedRole
-        ? normalizeSelectableRoleName(matchedRole.name)
-        : null
+      if (oldRoles && typeof oldRoles === "object") {
+        savedRole = oldRoles[interaction.user.id]
+      }
+    } catch (err) {
+      console.error("Error loading old active roles:", err)
     }
   }
 
+  // usar rol guardado si aún lo tiene
+  if (
+    savedRole &&
+    memberGroups.includes(savedRole)
+  ) {
+    return savedRole
+  }
+
+  // fallback automático por prioridad
   const priority = [
     "Rival_Duo",
     "Elite_Four",
@@ -1190,11 +1196,6 @@ async function getUserGroup(interaction) {
 
   for (const role of priority) {
     if (memberGroups.includes(role)) {
-
-      await redis.hset(activeRolesKey(), {
-        [interaction.user.id]: role
-      })
-
       return role
     }
   }
@@ -1783,27 +1784,41 @@ if (interaction.customId === "online_list") {
     }
   }
 
+if (group === "Elite_Four") {
+
   const rivalDuos = await loadAllRivalDuos()
 
   for (const duo of Object.values(rivalDuos)) {
+
     if (!duo) continue
 
     const members = getRivalDuoMembers(duo)
 
     for (const member of members) {
+
       const gameId = String(member.gameId || "").trim()
 
       if (!gameId) continue
 
+      // SOLO mostrar ID ACTIVO
+      if (String(duo.activeGameId || "").trim() !== gameId) {
+        continue
+      }
+
+      // SOLO si está online en Elite Four
       if (!normalizedIds.includes(gameId)) {
         continue
       }
 
-      msg += `🤝 ${member.name || "Unknown"} | 📡 ${member.heartbeatName || member.name || "Unknown"} → Rival Duo: ${gameId}\n`
+      msg +=
+        `🤝 ${member.name || "Unknown"} | ` +
+        `📡 ${member.heartbeatName || member.name || "Unknown"} ` +
+        `→ Rival Duo Active: ${gameId}\n`
 
       found = true
     }
   }
+}
 
   if (!found) {
     msg += "⚫ No registered users online\n"
@@ -1959,9 +1974,10 @@ if (alreadyUsed) {
       const result = await registerRivalDuoMember(pending)
 
       if (result.ok) {
-        await redis.hset(activeRolesKey(), {
-          [interaction.user.id]: "Rival_Duo"
-        })
+    await redis.set(
+  `active_roles:${interaction.user.id}`,
+  selected
+)
       }
 
       return interaction.reply({
@@ -2281,9 +2297,10 @@ const result = await registerRivalDuoMember({
 })
 
 if (result.ok) {
-  await redis.hset(activeRolesKey(), {
-    [interaction.user.id]: "Rival_Duo"
-  })
+await redis.set(
+  `active_roles:${interaction.user.id}`,
+  selected
+)
 }
 
 await clearPendingRivalDuoRegistration(interaction.user.id)
@@ -2412,9 +2429,10 @@ if (interaction.customId === "forced_offline_user_select") {
 if (interaction.customId === "role_select") {
   const selected = interaction.values[0]
 
-  await redis.hset(activeRolesKey(), {
-    [interaction.user.id]: selected
-  })
+  await redis.set(
+  `active_roles:${interaction.user.id}`,
+  selected
+)
 
   return interaction.update({
     content: `✅ Active role set to **${getSelectableRoleLabel(selected)}**`,
