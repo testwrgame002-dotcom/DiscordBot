@@ -575,7 +575,7 @@ async function toggleCedeReroll(interaction) {
 
   if (!duo) {
     return interaction.reply({
-      content: "❌ No estás registrado en ningún Rival Duo.",
+      content: "❌ You are not registered in any active Rival Duo.",
       flags: [MessageFlags.Ephemeral]
     });
   }
@@ -590,17 +590,17 @@ async function toggleCedeReroll(interaction) {
 
   await saveRivalDuo(duo);
 
-  // Forzamos rotación inmediata si el usuario que cede es actualmente el activo
+  // Forzar rotación inmediata si el usuario que cede es el activo actualmente
   if (duo.cededUsers[discordId] && String(duo.activeDiscordId) === discordId) {
     await activateRivalDuoId(duo, true);
   } else {
-    // Si solo cancela la cesión, recalculamos sin cambiar drásticamente a menos que toque
     await saveRivalDuo(duo);
   }
 
+  // Mensajes de estado en inglés
   const estadoMsg = duo.cededUsers[discordId] 
-    ? "⚠️ **Has cedido tu reroll**. Tu ID ya no se activará en las rotaciones por hora; tu compañero mantendrá el control."
-    : "✅ **Has recuperado tu reroll**. Tu ID volverá a entrar en la rotación normal por hora.";
+    ? "⚠️ **You have yielded your reroll**. Your ID will be skipped during hourly rotations, keeping your partner active (Solo Mode)."
+    : "✅ **You have reclaimed your reroll**. Your ID will now participate in the normal hourly rotation again.";
 
   return interaction.reply({
     content: estadoMsg,
@@ -827,7 +827,7 @@ async function buildRivalDuoListMessage() {
 
 if (members[0]) {
   const onlineIcon = duo.onlineUsers?.[members[0].discordId] ? "🟢" : "🔴"
-  const cededTag = duo.cededUsers?.[members[0].discordId] ? " 🚫 *(Reroll Cedido)*" : ""
+  const cededTag = duo.cededUsers?.[members[0].discordId] ? " 🚫 *(Reroll Yielded)*" : ""
   msg += `${onlineIcon} User A: <@${members[0].discordId}> | ID: \`${members[0].gameId}\`${cededTag}\n`
 } else {
   msg += `⚫ User A: Empty\n`
@@ -835,7 +835,7 @@ if (members[0]) {
 
 if (members[1]) {
   const onlineIcon = duo.onlineUsers?.[members[1].discordId] ? "🟢" : "🔴"
-  const cededTag = duo.cededUsers?.[members[1].discordId] ? " 🚫 *(Reroll Cedido)*" : ""
+  const cededTag = duo.cededUsers?.[members[1].discordId] ? " 🚫 *(Reroll Yielded)*" : ""
   msg += `${onlineIcon} User B: <@${members[1].discordId}> | ID: \`${members[1].gameId}\`${cededTag}\n`
 } else {
   msg += `⚫ User B: Empty\n`
@@ -1375,7 +1375,7 @@ const row5 = new ActionRowBuilder().addComponents(
   new ButtonBuilder().setCustomId("heartbeat_name").setLabel("Heartbeat Name").setStyle(ButtonStyle.Secondary),
   new ButtonBuilder().setCustomId("register_duo").setLabel("Register Duo").setStyle(ButtonStyle.Primary),
   new ButtonBuilder().setCustomId("duo_list").setLabel("Duo List").setStyle(ButtonStyle.Secondary),
-  new ButtonBuilder().setCustomId("cede_reroll").setLabel("Ceder Reroll").setStyle(ButtonStyle.Danger) // 👈 NUEVO BOTÓN
+  new ButtonBuilder().setCustomId("cede_reroll").setLabel("Yield Reroll").setStyle(ButtonStyle.Danger) // 👈 NUEVO BOTÓN
 )
   const panelPayload = {
     embeds:[embed],
