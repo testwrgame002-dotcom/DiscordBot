@@ -425,11 +425,9 @@ async function activateRivalDuoId(duo, force = false) {
 
   if (members.length < 2) {
     await removeRivalDuoIdsFromElite(duo)
-
     duo.activeGameId = null
     duo.activeDiscordId = null
     duo.status = "waiting_partner"
-
     await saveRivalDuo(duo)
 
     return {
@@ -439,19 +437,16 @@ async function activateRivalDuoId(duo, force = false) {
     }
   }
 
-const onlineMembers = members.filter(member =>
-  duo.onlineUsers?.[member.discordId] === true
-)
-
-const bothOnline = onlineMembers.length >= 2
+  const onlineMembers = members.filter(member =>
+    duo.onlineUsers?.[member.discordId] === true
+  )
+  const bothOnline = onlineMembers.length >= 2
 
   if (!bothOnline) {
     await removeRivalDuoIdsFromElite(duo)
-
     duo.activeGameId = null
     duo.activeDiscordId = null
     duo.status = "waiting_partner"
-
     await saveRivalDuo(duo)
 
     return {
@@ -462,30 +457,46 @@ const bothOnline = onlineMembers.length >= 2
   }
 
   const now = rivalNow()
-
   const shouldRotate =
     force ||
     !duo.lastRotationAt ||
-    //now - Number(duo.lastRotationAt || 0) >= 60 * 60 * 1000
     now - Number(duo.lastRotationAt || 0) >= RIVAL_DUO_ROTATION_MS
 
   if (!duo.activeGameId || shouldRotate) {
-    const index = Number(duo.activeIndex || 0) % members.length
-    const activeMember = members[index]
+    // 🎯 NUEVA LÓGICA: Verificar si algún usuario cedió su reroll
+    let activeMember = null;
     
-if (!activeMember || !isValidGameId(activeMember.gameId)) {
-  return {
-    ok: false,
-    waiting: true,
-    message: "❌ Rival Duo active member has an invalid or missing game ID."
-  }
-}
+    const userACeded = duo.cededUsers?.[members[0].discordId] === true;
+    const userBCeded = duo.cededUsers?.[members[1].discordId] === true;
+
+    if (userACeded && !userBCeded) {
+      // Usuario A cedió, solo juega Usuario B
+      activeMember = members[1];
+      duo.activeIndex = 0; // Apuntar al siguiente de forma segura
+    } else if (userBCeded && !userACeded) {
+      // Usuario B cedió, solo juega Usuario A
+      activeMember = members[0];
+      duo.activeIndex = 1;
+    } else {
+      // Comportamiento normal por orden si nadie cedió (o si ambos lo presionaron por error)
+      const index = Number(duo.activeIndex || 0) % members.length
+      activeMember = members[index]
+      duo.activeIndex = (index + 1) % members.length
+    }
+    
+    if (!activeMember || !isValidGameId(activeMember.gameId)) {
+      return {
+        ok: false,
+        waiting: true,
+        message: "❌ Rival Duo active member has an invalid or missing game ID."
+      }
+    }
+
     await removeRivalDuoIdsFromElite(duo)
 
     duo.activeGameId = activeMember.gameId
     duo.activeDiscordId = activeMember.discordId
     duo.lastRotationAt = now
-    duo.activeIndex = (index + 1) % members.length
     duo.status = "online"
 
     await redis.sadd("online:Elite_Four", String(activeMember.gameId))
@@ -494,20 +505,20 @@ if (!activeMember || !isValidGameId(activeMember.gameId)) {
     return {
       ok: true,
       waiting: false,
-      message: `🟢 Rival Duo online in Elite Four.\nActive ID: **${activeMember.gameId}**\nActive user: <@${activeMember.discordId}>`
+      message: `🟢 Rival Duo online in Elite Four.\nActive ID: **${activeMember.gameId}**\nActive user: <@${activeMember.discordId}>${(userACeded || userBCeded) ? " ⚠️ (Solo Mode Active)" : ""}`
     }
   }
 
-if (!isValidGameId(duo.activeGameId)) {
-  return {
-    ok: false,
-    waiting: true,
-    message: "❌ Rival Duo activeGameId is invalid or missing."
+  if (!isValidGameId(duo.activeGameId)) {
+    return {
+      ok: false,
+      waiting: true,
+      message: "❌ Rival Duo activeGameId is invalid or missing."
+    }
   }
-}
 
-await redis.sadd("online:Elite_Four", String(duo.activeGameId))
-await saveRivalDuo(duo)
+  await redis.sadd("online:Elite_Four", String(duo.activeGameId))
+  await saveRivalDuo(duo)
 
   return {
     ok: true,
@@ -558,7 +569,44 @@ async function setRivalDuoOnline(discordId) {
     message: messages.join("\n\n")
   }
 }
+async function toggleCedeReroll(interaction) {
+  const discordId = String(interaction.user.id);
+  const duo = await getRivalDuoByUser(discordId);
 
+  if (!duo) {
+    return interaction.reply({
+      content: "❌ No estás registrado en ningún Rival Duo.",
+      flags: [MessageFlags.Ephemeral]
+    });
+  }
+
+  if (!duo.cededUsers) {
+    duo.cededUsers = {};
+  }
+
+  // Cambiar estado (True/False)
+  const isCeded = duo.cededUsers[discordId] === true;
+  duo.cededUsers[discordId] = !isCeded;
+
+  await saveRivalDuo(duo);
+
+  // Forzamos rotación inmediata si el usuario que cede es actualmente el activo
+  if (duo.cededUsers[discordId] && String(duo.activeDiscordId) === discordId) {
+    await activateRivalDuoId(duo, true);
+  } else {
+    // Si solo cancela la cesión, recalculamos sin cambiar drásticamente a menos que toque
+    await saveRivalDuo(duo);
+  }
+
+  const estadoMsg = duo.cededUsers[discordId] 
+    ? "⚠️ **Has cedido tu reroll**. Tu ID ya no se activará en las rotaciones por hora; tu compañero mantendrá el control."
+    : "✅ **Has recuperado tu reroll**. Tu ID volverá a entrar en la rotación normal por hora.";
+
+  return interaction.reply({
+    content: estadoMsg,
+    flags: [MessageFlags.Ephemeral]
+  });
+}
 async function setRivalDuoOffline(discordId, reason = "offline") {
   discordId = String(discordId)
 
@@ -777,19 +825,21 @@ async function buildRivalDuoListMessage() {
     msg += `**#${index} — ${displayRivalDuoName(duo)}**\n`
     msg += `Status: ${status}\n`
 
-    if (members[0]) {
-      const onlineIcon = duo.onlineUsers?.[members[0].discordId] ? "🟢" : "🔴"
-      msg += `${onlineIcon} User A: <@${members[0].discordId}> | ID: \`${members[0].gameId}\`\n`
-    } else {
-      msg += `⚫ User A: Empty\n`
-    }
+if (members[0]) {
+  const onlineIcon = duo.onlineUsers?.[members[0].discordId] ? "🟢" : "🔴"
+  const cededTag = duo.cededUsers?.[members[0].discordId] ? " 🚫 *(Reroll Cedido)*" : ""
+  msg += `${onlineIcon} User A: <@${members[0].discordId}> | ID: \`${members[0].gameId}\`${cededTag}\n`
+} else {
+  msg += `⚫ User A: Empty\n`
+}
 
-    if (members[1]) {
-      const onlineIcon = duo.onlineUsers?.[members[1].discordId] ? "🟢" : "🔴"
-      msg += `${onlineIcon} User B: <@${members[1].discordId}> | ID: \`${members[1].gameId}\`\n`
-    } else {
-      msg += `⚫ User B: Empty\n`
-    }
+if (members[1]) {
+  const onlineIcon = duo.onlineUsers?.[members[1].discordId] ? "🟢" : "🔴"
+  const cededTag = duo.cededUsers?.[members[1].discordId] ? " 🚫 *(Reroll Cedido)*" : ""
+  msg += `${onlineIcon} User B: <@${members[1].discordId}> | ID: \`${members[1].gameId}\`${cededTag}\n`
+} else {
+  msg += `⚫ User B: Empty\n`
+}
 
     if (duo.activeGameId) {
       msg += `Active ID: \`${duo.activeGameId}\`\n`
@@ -1324,7 +1374,8 @@ const row5 = new ActionRowBuilder().addComponents(
   new ButtonBuilder().setCustomId("gp").setLabel("Add VIP").setStyle(ButtonStyle.Success),
   new ButtonBuilder().setCustomId("heartbeat_name").setLabel("Heartbeat Name").setStyle(ButtonStyle.Secondary),
   new ButtonBuilder().setCustomId("register_duo").setLabel("Register Duo").setStyle(ButtonStyle.Primary),
-  new ButtonBuilder().setCustomId("duo_list").setLabel("Duo List").setStyle(ButtonStyle.Secondary)
+  new ButtonBuilder().setCustomId("duo_list").setLabel("Duo List").setStyle(ButtonStyle.Secondary),
+  new ButtonBuilder().setCustomId("cede_reroll").setLabel("Ceder Reroll").setStyle(ButtonStyle.Danger) // 👈 NUEVO BOTÓN
 )
   const panelPayload = {
     embeds:[embed],
@@ -1397,7 +1448,8 @@ const OWN_BUTTONS = new Set([
   "gp",
   "heartbeat_name",
   "register_duo",
-"duo_list"
+"duo_list",
+  "cede_reroll"
 ]);
 
 const OWN_MODALS = new Set([
@@ -1450,6 +1502,20 @@ client.on("interactionCreate", async interaction => {
 
     // ================= BOTONES =================
 if (interaction.isButton()) {
+  // 👇 NUEVO: Intercepción del botón cede_reroll
+      if (interaction.customId === "cede_reroll") {
+        const hasRole = interaction.member.roles.cache.some(r => r.name === "Rival_Duo")
+
+        if (!hasRole) {
+          return interaction.reply({
+            content: "❌ You need the Rival_Duo role to use this button.",
+            flags: MessageFlags.Ephemeral
+          })
+        }
+
+        // Llamamos a la función controladora (creada en la respuesta anterior)
+        return await toggleCedeReroll(interaction);
+      }
 
   if (interaction.customId === "register_duo") {
     const hasRole = interaction.member.roles.cache.some(r => r.name === "Rival_Duo")
