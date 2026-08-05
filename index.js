@@ -1537,7 +1537,11 @@ if (interaction.isButton()) {
     return interaction.showModal(modal)
   }
 
-  if (interaction.customId === "users_per_group") {
+if (interaction.customId === "users_per_group") {
+
+  await interaction.deferReply({
+    flags: MessageFlags.Ephemeral
+  })
 
   const lines = []
 
@@ -1549,11 +1553,10 @@ if (interaction.isButton()) {
     )
   }
 
-  return interaction.reply({
+  return interaction.editReply({
     content:
       "## 📊 Users Online by Group\n\n" +
-      lines.join("\n"),
-    flags: MessageFlags.Ephemeral
+      lines.join("\n")
   })
 }
   if (interaction.customId === "duo_list") {
