@@ -1346,8 +1346,7 @@ async function sendPanel(channel){
 
   const row3 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId("list").setLabel("List").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("online_list").setLabel("Online List").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("users_per_group").setLabel("Users per Group").setEmoji("📊").setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId("online_list").setLabel("Online List").setStyle(ButtonStyle.Secondary)
   )
 
   const row4 = new ActionRowBuilder().addComponents(
@@ -1537,28 +1536,6 @@ if (interaction.isButton()) {
     return interaction.showModal(modal)
   }
 
-if (interaction.customId === "users_per_group") {
-
-  await interaction.deferReply({
-    flags: MessageFlags.Ephemeral
-  })
-
-  const lines = []
-
-  for (const group of Object.keys(GROUP_CONFIG)) {
-    const onlineUsers = await getOnlineUsersByGroup(group)
-
-    lines.push(
-      `📍 **${group}**: **${onlineUsers.length}/9** online`
-    )
-  }
-
-  return interaction.editReply({
-    content:
-      "## 📊 Users Online by Group\n\n" +
-      lines.join("\n")
-  })
-}
   if (interaction.customId === "duo_list") {
   const hasRole =
     interaction.member.roles.cache.some(r => r.name === "Rival_Duo") ||
