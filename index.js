@@ -1346,7 +1346,8 @@ async function sendPanel(channel){
 
   const row3 = new ActionRowBuilder().addComponents(
     new ButtonBuilder().setCustomId("list").setLabel("List").setStyle(ButtonStyle.Secondary),
-    new ButtonBuilder().setCustomId("online_list").setLabel("Online List").setStyle(ButtonStyle.Secondary)
+    new ButtonBuilder().setCustomId("online_list").setLabel("Online List").setStyle(ButtonStyle.Secondary),
+    new ButtonBuilder().setCustomId("users_per_group").setLabel("Users per Group").setEmoji("📊").setStyle(ButtonStyle.Secondary)
   )
 
   const row4 = new ActionRowBuilder().addComponents(
@@ -1536,6 +1537,25 @@ if (interaction.isButton()) {
     return interaction.showModal(modal)
   }
 
+  if (interaction.customId === "users_per_group") {
+
+  const lines = []
+
+  for (const group of Object.keys(GROUP_CONFIG)) {
+    const onlineUsers = await getOnlineUsersByGroup(group)
+
+    lines.push(
+      `📍 **${group}**: **${onlineUsers.length}/9** online`
+    )
+  }
+
+  return interaction.reply({
+    content:
+      "## 📊 Users Online by Group\n\n" +
+      lines.join("\n"),
+    flags: MessageFlags.Ephemeral
+  })
+}
   if (interaction.customId === "duo_list") {
   const hasRole =
     interaction.member.roles.cache.some(r => r.name === "Rival_Duo") ||
@@ -1578,6 +1598,8 @@ if (interaction.customId === "change" && await isActiveRivalDuo(interaction)) {
 
   return interaction.showModal(modal)
 }
+
+  
 const isRivalDuoButton = ["online", "offline"].includes(interaction.customId) &&
   await isActiveRivalDuo(interaction)
 
@@ -1695,20 +1717,31 @@ if (!isModalButton && !interaction.deferred && !interaction.replied) {
 
 if (interaction.customId === "online") {
 
-const activeGroup = await getUserGroup(interaction)
+  const activeGroup = await getUserGroup(interaction)
 
-const found = await findUserRegistration(
-  interaction.user.id,
-  activeGroup
-)
+  const found = await findUserRegistration(
+    interaction.user.id,
+    activeGroup
+  )
 
-if (!found) {
-  return interaction.editReply("❌ Register first")
-}
+  if (!found) {
+    return interaction.editReply("❌ Register first")
+  }
 
-const { group, users, userData } = found
+  const { group, users, userData } = found
 
-  if (!userData?.main_id) return interaction.editReply("❌ Register first")
+  if (!userData?.main_id) {
+    return interaction.editReply("❌ Register first")
+  }
+
+  // Límite de 9 usuarios online por grupo
+  const onlineUsers = await getOnlineUsersByGroup(group)
+
+  if (onlineUsers.length >= 9) {
+    return interaction.editReply(
+      `❌ The **${group}** group already has the maximum of **9** users online.`
+    )
+  }
 
   const ok = await setOnlineStatus("online", userData.main_id, group)
 
