@@ -1717,9 +1717,9 @@ if (interaction.customId === "online") {
   // Límite de 9 usuarios online por grupo
   const onlineUsers = await getOnlineUsersByGroup(group)
 
-  if (onlineUsers.length >= 9) {
+  if (onlineUsers.length >= 10) {
     return interaction.editReply(
-      `❌ The **${group}** group already has the maximum of **9** users online.`
+      `❌ The **${group}** group already has the maximum of **10** users online.`
     )
   }
 
