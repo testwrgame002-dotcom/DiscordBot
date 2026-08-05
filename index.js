@@ -949,35 +949,20 @@ function isValidId(id) {
   return /^\d{16}$/.test(String(id).trim())
 }
 
-async function isGameIdAlreadyUsed(id) {
+async function isGameIdAlreadyUsed(id, group) {
   id = String(id).trim()
 
-  // usuarios normales
-  for (const group of Object.keys(GROUP_CONFIG)) {
-    const users = await getUsers(group)
+  // Solo revisar el grupo actual
+  const users = await getUsers(group)
 
-    for (const uid in users) {
-      const u = users[uid]
+  for (const uid in users) {
+    const u = users[uid]
 
-      if (
-        String(u.main_id || "").trim() === id ||
-        String(u.sec_id || "").trim() === id
-      ) {
-        return true
-      }
-    }
-  }
-
-  // rival duos
-  const duos = await loadAllRivalDuos()
-
-  for (const duo of Object.values(duos)) {
-    const members = getRivalDuoMembers(duo)
-
-    for (const member of members) {
-      if (String(member.gameId || "").trim() === id) {
-        return true
-      }
+    if (
+      String(u.main_id || "").trim() === id ||
+      String(u.sec_id || "").trim() === id
+    ) {
+      return true
     }
   }
 
@@ -2015,14 +2000,6 @@ if (interaction.isModalSubmit()) {
       })
     }
 
-    const alreadyUsed = await isGameIdAlreadyUsed(gameId)
-
-if (alreadyUsed) {
-  return interaction.reply({
-    content: "❌ This ID is already registered.",
-    flags: MessageFlags.Ephemeral
-  })
-}
 
     const pending = {
       discordId: interaction.user.id,
@@ -2105,11 +2082,11 @@ if (interaction.customId === "change_modal") {
             flags: MessageFlags.Ephemeral
           })
         }
-        const alreadyUsed = await isGameIdAlreadyUsed(id)
+const alreadyUsed = await isGameIdAlreadyUsed(id, group)
 
 if (alreadyUsed) {
   return interaction.reply({
-    content: "❌ This ID is already registered by another user.",
+    content: "❌ This ID is already registered by another user in this group.",
     flags: MessageFlags.Ephemeral
   })
 }
@@ -2140,11 +2117,11 @@ await saveUsers(users, group)
             flags: MessageFlags.Ephemeral
           })
         }
-        const alreadyUsed = await isGameIdAlreadyUsed(id)
+const alreadyUsed = await isGameIdAlreadyUsed(id, group)
 
 if (alreadyUsed) {
   return interaction.reply({
-    content: "❌ This ID is already registered by another user.",
+    content: "❌ This ID is already registered by another user in this group.",
     flags: MessageFlags.Ephemeral
   })
 }
@@ -2176,11 +2153,11 @@ if (interaction.customId === "change_modal") {
       flags: MessageFlags.Ephemeral
     })
   }
-const alreadyUsed = await isGameIdAlreadyUsed(id)
+const alreadyUsed = await isGameIdAlreadyUsed(id, group)
 
 if (alreadyUsed) {
   return interaction.reply({
-    content: "❌ This ID is already registered by another user.",
+    content: "❌ This ID is already registered by another user in this group.",
     flags: MessageFlags.Ephemeral
   })
 }
