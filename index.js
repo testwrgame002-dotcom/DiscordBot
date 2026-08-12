@@ -2615,10 +2615,7 @@ if (interaction.customId === "rival_duo_register_modal") {
       const result = await registerRivalDuoMember(pending)
 
       if (result.ok) {
-    await redis.set(
-  `active_roles:${interaction.user.id}`,
-  selected
-)
+
       }
 
 return interaction.editReply({
