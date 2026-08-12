@@ -1856,12 +1856,11 @@ client.on("interactionCreate", async interaction => {
 ) return
 
 
-
 if (
   interaction.isButton() &&
   ["online", "offline"].includes(interaction.customId)
 ) {
-  return interaction.reply({
+  await interaction.reply({
     content: "⏳ Processing...",
     flags: MessageFlags.Ephemeral
   })
