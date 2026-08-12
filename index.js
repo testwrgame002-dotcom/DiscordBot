@@ -494,15 +494,28 @@ async function getRivalDuoSelectedGroup(duo) {
   }
 }
 
-
 async function getOnlineUserCountExcludingDuo(group, duoId = null) {
-  const onlineUsers = await getOnlineUsersByGroup(group)
+  const onlineIds = await getOnlineIDs(group)
 
-  return onlineUsers.filter(user => {
-    if (!duoId) return true
-    return user.duoId !== duoId
-  }).length
+  if (!duoId) {
+    return onlineIds.length
+  }
+
+  const duo = await getRivalDuoById(duoId)
+
+  if (!duo) {
+    return onlineIds.length
+  }
+
+  const duoIds = getRivalDuoMembers(duo)
+    .map(member => String(member.gameId || "").trim())
+    .filter(isValidGameId)
+
+  return onlineIds.filter(id =>
+    !duoIds.includes(String(id).trim())
+  ).length
 }
+
 
 
 function buildRivalDuoGroupMenu(duo, discordId) {
