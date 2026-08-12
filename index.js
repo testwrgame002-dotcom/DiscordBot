@@ -1845,14 +1845,16 @@ client.on("interactionCreate", async interaction => {
   try {
     if (!isOwnInteraction(interaction)) return
 
-    if (interaction.deferred || interaction.replied) {
-      console.warn(
-        "Interaction already acknowledged before index handler:",
-        interaction.customId,
-        interaction.user.id
-      )
-      return
-    }
+if (interaction.deferred || interaction.replied) {
+  return interaction.editReply({
+    content: `❌ Rival Duo error: ${err.message || "Unknown error"}`
+  })
+}
+
+return interaction.reply({
+  content: `❌ Rival Duo error: ${err.message || "Unknown error"}`,
+  flags: MessageFlags.Ephemeral
+})
 
     // ================= BOTONES =================
 if (interaction.isButton()) {
@@ -2111,9 +2113,11 @@ const isRivalDuoButton =
 
 if (isRivalDuoButton) {
 
+if (!interaction.replied && !interaction.deferred) {
   await interaction.deferReply({
     flags: MessageFlags.Ephemeral
   })
+}
 
   const isRivalDuo =
     await isActiveRivalDuo(interaction)
