@@ -1845,17 +1845,18 @@ client.on("interactionCreate", async interaction => {
   try {
     if (!isOwnInteraction(interaction)) return
 
-    if (
+   if (
   interaction.isButton() &&
   ["online", "offline"].includes(interaction.customId)
 ) {
+
+  await interaction.deferReply({
+    flags: MessageFlags.Ephemeral
+  })
+
   const isRivalDuo = await isActiveRivalDuo(interaction)
 
   if (isRivalDuo) {
-    await interaction.deferReply({
-      flags: MessageFlags.Ephemeral
-    })
-
     try {
       if (interaction.customId === "online") {
         const result = await setRivalDuoOnline(interaction.user.id)
