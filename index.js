@@ -1864,34 +1864,33 @@ if (
     content: "⏳ Processing...",
     flags: MessageFlags.Ephemeral
   })
-}
 
-  try {
-    const isRivalDuo = await isActiveRivalDuo(interaction)
+  const isRivalDuo = await isActiveRivalDuo(interaction)
 
-    // ================= RIVAL DUO =================
-if (isRivalDuo) {
-  if (interaction.customId === "online") {
-    const result = await setRivalDuoOnline(
-      interaction.user.id
-    )
+  if (isRivalDuo) {
+    if (interaction.customId === "online") {
+      const result = await setRivalDuoOnline(
+        interaction.user.id
+      )
 
-    if (!result.ok) {
-      return interaction.editReply(result.message)
+      if (!result.ok) {
+        return interaction.editReply(result.message)
+      }
+
+      return interaction.editReply({
+        content:
+          result.message +
+          "\n\n**Both members must select the same group.**",
+        components: [
+          buildRivalDuoGroupMenu(
+            result.duo,
+            interaction.user.id
+          )
+        ]
+      })
     }
-
-    return interaction.editReply({
-      content:
-        result.message +
-        "\n\n**Both members must select the same group.**",
-      components: [
-        buildRivalDuoGroupMenu(
-          result.duo,
-          interaction.user.id
-        )
-      ]
-    })
   }
+}
 
       const result = await setRivalDuoOffline(
         interaction.user.id,
