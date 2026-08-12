@@ -397,12 +397,6 @@ const saved = await saveRivalDuo(duo)
   }
 
 
-  if (!indexed) {
-    return {
-      ok: false,
-      message: "❌ Rival Duo was saved, but indexes could not be updated."
-    }
-  }
 
   if (isRivalDuoFull(reloaded)) {
     return {
