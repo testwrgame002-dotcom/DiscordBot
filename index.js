@@ -1863,15 +1863,6 @@ if (
   }
 }
 
-    
-    if (interaction.deferred || interaction.replied) {
-      console.warn(
-        "Interaction already acknowledged before index handler:",
-        interaction.customId,
-        interaction.user.id
-      )
-      return
-    }
 
     // ================= BOTONES =================
 if (interaction.isButton()) {
