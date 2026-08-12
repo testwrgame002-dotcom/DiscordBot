@@ -1858,9 +1858,10 @@ if (
   interaction.isButton() &&
   ["online", "offline"].includes(interaction.customId)
 ) {
-  await interaction.deferReply({
-    flags: MessageFlags.Ephemeral
-  })
+await interaction.reply({
+  content: "⏳ Processing...",
+  flags: MessageFlags.Ephemeral
+})
 
   try {
     const isRivalDuo = await isActiveRivalDuo(interaction)
