@@ -1600,13 +1600,17 @@ async function getUserGroup(interaction) {
   return null
 }
 async function isActiveRivalDuo(interaction) {
-const selected = await getActiveRoles(interaction.user.id)
-
   const hasRivalDuoRole = interaction.member.roles.cache.some(role =>
     role.name === "Rival_Duo" || role.name === "Rival Duo"
   )
 
-  return hasRivalDuoRole && selected === "Rival_Duo"
+  if (!hasRivalDuoRole) {
+    return false
+  }
+
+  const duo = await getRivalDuoByUser(interaction.user.id)
+
+  return !!duo
 }
 /// panel
 async function loadPanelData() {
@@ -2570,12 +2574,7 @@ if (interaction.isModalSubmit()) {
 
       const result = await registerRivalDuoMember(pending)
 
-      if (result.ok) {
-    await redis.set(
-  `active_roles:${interaction.user.id}`,
-  selected
-)
-      }
+
 
       return interaction.reply({
         content: result.message,
