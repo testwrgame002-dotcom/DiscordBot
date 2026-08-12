@@ -1832,11 +1832,13 @@ function isOwnInteraction(interaction) {
   }
 
 if (interaction.isStringSelectMenu()) {
-  return (
-    OWN_SELECTS.has(interaction.customId) || interaction.customId.startsWith("gp_group_select:") || interaction.customId.startsWith("rival_duo_select_")
-  )
+return (
+OWN_SELECTS.has(interaction.customId) ||
+interaction.customId.startsWith("gp_group_select:") ||
+interaction.customId.startsWith("rival_duo_select_") ||
+interaction.customId.startsWith("rival_duo_group_select_")
+)
 }
-
   return false
 }
 
