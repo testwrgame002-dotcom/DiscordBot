@@ -2591,12 +2591,11 @@ if (interaction.customId === "rival_duo_register_modal") {
   const gameId = interaction.fields.getTextInputValue("game_id").trim()
   const heartbeatName = interaction.fields.getTextInputValue("heartbeat_name").trim()
 
-    if (!isValidGameId(gameId)) {
-      return interaction.reply({
-        content: "❌ The ID must be exactly 16 digits.",
-        flags: MessageFlags.Ephemeral
-      })
-    }
+  if (!isValidGameId(gameId)) {
+  return interaction.editReply({
+    content: "❌ The ID must be exactly 16 digits."
+  })
+}
 
 
     const pending = {
@@ -2637,7 +2636,7 @@ content: result.message
         }))
       ])
 
-    return interaction.reply({
+    return interaction.editReply({
       content: "There are open Rival Duo registrations. Select one or create a new Duo.",
       components: [new ActionRowBuilder().addComponents(menu)],
       flags: MessageFlags.Ephemeral
