@@ -2111,74 +2111,73 @@ const isRivalDuoButton =
 
 if (isRivalDuoButton) {
 
-  // Primero comprobamos el rol activo sin responder todavía
+  await interaction.deferReply({
+    flags: MessageFlags.Ephemeral
+  })
+
   const isRivalDuo =
     await isActiveRivalDuo(interaction)
 
-  if (isRivalDuo) {
-    try {
+  if (!isRivalDuo) {
+    return
+  }
 
-      // RESPONDER A DISCORD INMEDIATAMENTE
-      await interaction.deferReply({
-        flags: MessageFlags.Ephemeral
-      })
+  try {
 
-      if (interaction.customId === "online") {
+    if (interaction.customId === "online") {
 
-        const result =
-          await setRivalDuoOnline(
-            interaction.user.id
-          )
+      const result =
+        await setRivalDuoOnline(
+          interaction.user.id
+        )
 
-        if (!result.ok) {
-          return interaction.editReply(
-            result.message
-          )
-        }
-
-        return interaction.editReply({
-          content:
-            result.message +
-            "\n\n**Both members must select the same group.**",
-          components: [
-            buildRivalDuoGroupMenu(
-              result.duo,
-              interaction.user.id
-            )
-          ]
-        })
-      }
-
-      if (interaction.customId === "offline") {
-
-        const result =
-          await setRivalDuoOffline(
-            interaction.user.id,
-            "manual_offline"
-          )
-
+      if (!result.ok) {
         return interaction.editReply(
-          result?.message ||
-          "❌ Rival Duo offline failed without response."
+          result.message
         )
       }
 
-    } catch (err) {
+      return interaction.editReply({
+        content:
+          result.message +
+          "\n\n**Both members must select the same group.**",
+        components: [
+          buildRivalDuoGroupMenu(
+            result.duo,
+            interaction.user.id
+          )
+        ]
+      })
+    }
 
-      console.error(
-        "RIVAL DUO BUTTON ERROR:",
-        err
-      )
+    if (interaction.customId === "offline") {
+
+      const result =
+        await setRivalDuoOffline(
+          interaction.user.id,
+          "manual_offline"
+        )
 
       return interaction.editReply(
-        `❌ Rival Duo error: ${
-          err.message || "Unknown error"
-        }`
+        result?.message ||
+        "❌ Rival Duo offline failed without response."
       )
     }
+
+  } catch (err) {
+
+    console.error(
+      "RIVAL DUO BUTTON ERROR:",
+      err
+    )
+
+    return interaction.editReply(
+      `❌ Rival Duo error: ${
+        err.message || "Unknown error"
+      }`
+    )
   }
 }
-
 // =====================================================
 // SI NO ES RIVAL DUO → CONTINÚA EL FLUJO NORMAL
 // =====================================================
