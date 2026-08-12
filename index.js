@@ -1868,7 +1868,6 @@ await interaction.reply({
 
     // ================= RIVAL DUO =================
 if (isRivalDuo) {
-
   if (interaction.customId === "online") {
     const result = await setRivalDuoOnline(
       interaction.user.id
@@ -1878,7 +1877,7 @@ if (isRivalDuo) {
       return interaction.editReply(result.message)
     }
 
-    return await interaction.editReply({
+    return interaction.editReply({
       content:
         result.message +
         "\n\n**Both members must select the same group.**",
