@@ -1607,13 +1607,18 @@ async function getUserGroup(interaction) {
   return null
 }
 async function isActiveRivalDuo(interaction) {
-const selected = await getActiveRoles(interaction.user.id)
-
   const hasRivalDuoRole = interaction.member.roles.cache.some(role =>
-    role.name === "Rival_Duo" || role.name === "Rival Duo"
+    role.name === "Rival_Duo" ||
+    role.name === "Rival Duo"
   )
 
-  return hasRivalDuoRole && selected === "Rival_Duo"
+  if (!hasRivalDuoRole) {
+    return false
+  }
+
+  const duo = await getRivalDuoByUser(interaction.user.id)
+
+  return !!duo
 }
 /// panel
 async function loadPanelData() {
@@ -1861,29 +1866,29 @@ if (
     const isRivalDuo = await isActiveRivalDuo(interaction)
 
     // ================= RIVAL DUO =================
-    if (isRivalDuo) {
+if (isRivalDuo) {
 
-      if (interaction.customId === "online") {
-        const result = await setRivalDuoOnline(
+  if (interaction.customId === "online") {
+    const result = await setRivalDuoOnline(
+      interaction.user.id
+    )
+
+    if (!result.ok) {
+      return interaction.editReply(result.message)
+    }
+
+    return await interaction.editReply({
+      content:
+        result.message +
+        "\n\n**Both members must select the same group.**",
+      components: [
+        buildRivalDuoGroupMenu(
+          result.duo,
           interaction.user.id
         )
-
-        if (!result.ok) {
-          return interaction.editReply(result.message)
-        }
-
-        return interaction.editReply({
-          content:
-            result.message +
-            "\n\n**Both members must select the same group.**",
-          components: [
-            buildRivalDuoGroupMenu(
-              result.duo,
-              interaction.user.id
-            )
-          ]
-        })
-      }
+      ]
+    })
+  }
 
       const result = await setRivalDuoOffline(
         interaction.user.id,
