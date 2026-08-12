@@ -1850,7 +1850,10 @@ interaction.customId.startsWith("rival_duo_group_select_")
 // ================= INTERACTIONS =================
 client.on("interactionCreate", async interaction => {
   try {
-    if (!isOwnInteraction(interaction)) return
+    if (
+  !isOwnInteraction(interaction) &&
+  !(interaction.isButton() && ["online", "offline"].includes(interaction.customId))
+) return
 
 
 
@@ -1858,10 +1861,11 @@ if (
   interaction.isButton() &&
   ["online", "offline"].includes(interaction.customId)
 ) {
-await interaction.reply({
-  content: "⏳ Processing...",
-  flags: MessageFlags.Ephemeral
-})
+  return interaction.reply({
+    content: "⏳ Processing...",
+    flags: MessageFlags.Ephemeral
+  })
+}
 
   try {
     const isRivalDuo = await isActiveRivalDuo(interaction)
