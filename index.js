@@ -1845,6 +1845,57 @@ client.on("interactionCreate", async interaction => {
   try {
     if (!isOwnInteraction(interaction)) return
 
+    if (
+  interaction.isButton() &&
+  ["online", "offline"].includes(interaction.customId)
+) {
+  const isRivalDuo = await isActiveRivalDuo(interaction)
+
+  if (isRivalDuo) {
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    })
+
+    try {
+      if (interaction.customId === "online") {
+        const result = await setRivalDuoOnline(interaction.user.id)
+
+        if (!result.ok) {
+          return interaction.editReply(result.message)
+        }
+
+        return interaction.editReply({
+          content:
+            result.message +
+            "\n\n**Both members must select the same group.**",
+          components: [
+            buildRivalDuoGroupMenu(
+              result.duo,
+              interaction.user.id
+            )
+          ]
+        })
+      }
+
+      const result = await setRivalDuoOffline(
+        interaction.user.id,
+        "manual_offline"
+      )
+
+      return interaction.editReply(
+        result?.message || "❌ Rival Duo offline failed."
+      )
+
+    } catch (err) {
+      console.error("RIVAL DUO BUTTON ERROR:", err)
+
+      return interaction.editReply(
+        `❌ Rival Duo error: ${err.message || "Unknown error"}`
+      )
+    }
+  }
+}
+
 if (interaction.deferred || interaction.replied) {
   console.warn(
     "Interaction already acknowledged before index handler:",
@@ -2106,74 +2157,6 @@ if (
 }
   
 
-const isRivalDuoButton =
-  ["online", "offline"].includes(interaction.customId)
-
-if (isRivalDuoButton) {
-
-const isRivalDuo =
-await isActiveRivalDuo(interaction)
-
-if (!isRivalDuo) {
-return
-}
-
-try {
-
-    if (interaction.customId === "online") {
-
-      const result =
-        await setRivalDuoOnline(
-          interaction.user.id
-        )
-
-      if (!result.ok) {
-        return interaction.editReply(
-          result.message
-        )
-      }
-
-      return interaction.editReply({
-        content:
-          result.message +
-          "\n\n**Both members must select the same group.**",
-        components: [
-          buildRivalDuoGroupMenu(
-            result.duo,
-            interaction.user.id
-          )
-        ]
-      })
-    }
-
-    if (interaction.customId === "offline") {
-
-      const result =
-        await setRivalDuoOffline(
-          interaction.user.id,
-          "manual_offline"
-        )
-
-      return interaction.editReply(
-        result?.message ||
-        "❌ Rival Duo offline failed without response."
-      )
-    }
-
-  } catch (err) {
-
-    console.error(
-      "RIVAL DUO BUTTON ERROR:",
-      err
-    )
-
-    return interaction.editReply(
-      `❌ Rival Duo error: ${
-        err.message || "Unknown error"
-      }`
-    )
-  }
-}
 // =====================================================
 // SI NO ES RIVAL DUO → CONTINÚA EL FLUJO NORMAL
 // =====================================================
