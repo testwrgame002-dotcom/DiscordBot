@@ -2105,52 +2105,86 @@ if (
   }
 }
   
-const isRivalDuoButton = ["online", "offline"].includes(interaction.customId) &&
-  await isActiveRivalDuo(interaction)
+
+const isRivalDuoButton =
+  ["online", "offline"].includes(interaction.customId)
 
 if (isRivalDuoButton) {
-  try {
-if (interaction.customId === "online") {
-  const result = await setRivalDuoOnline(
-    interaction.user.id
-  )
 
-  if (!result.ok) {
-    return interaction.editReply(
-      result.message
-    )
-  }
+  // Primero comprobamos el rol activo sin responder todavía
+  const isRivalDuo =
+    await isActiveRivalDuo(interaction)
 
-  return interaction.editReply({
-    content:
-      result.message +
-      "\n\n**Both members must select the same group.**",
-    components: [
-      buildRivalDuoGroupMenu(
-        result.duo,
-        interaction.user.id
+  if (isRivalDuo) {
+    try {
+
+      // RESPONDER A DISCORD INMEDIATAMENTE
+      await interaction.deferReply({
+        flags: MessageFlags.Ephemeral
+      })
+
+      if (interaction.customId === "online") {
+
+        const result =
+          await setRivalDuoOnline(
+            interaction.user.id
+          )
+
+        if (!result.ok) {
+          return interaction.editReply(
+            result.message
+          )
+        }
+
+        return interaction.editReply({
+          content:
+            result.message +
+            "\n\n**Both members must select the same group.**",
+          components: [
+            buildRivalDuoGroupMenu(
+              result.duo,
+              interaction.user.id
+            )
+          ]
+        })
+      }
+
+      if (interaction.customId === "offline") {
+
+        const result =
+          await setRivalDuoOffline(
+            interaction.user.id,
+            "manual_offline"
+          )
+
+        return interaction.editReply(
+          result?.message ||
+          "❌ Rival Duo offline failed without response."
+        )
+      }
+
+    } catch (err) {
+
+      console.error(
+        "RIVAL DUO BUTTON ERROR:",
+        err
       )
-    ]
-  })
-}
-
-    if (interaction.customId === "offline") {
-      const result = await setRivalDuoOffline(interaction.user.id, "manual_offline")
 
       return interaction.editReply(
-        result?.message || "❌ Rival Duo offline failed without response."
+        `❌ Rival Duo error: ${
+          err.message || "Unknown error"
+        }`
       )
     }
-  } catch (err) {
-    console.error("RIVAL DUO BUTTON ERROR:", err)
-
-    return interaction.editReply(
-      `❌ Rival Duo error: ${err.message || "Unknown error"}`
-    )
   }
 }
 
-  const group = await getUserGroup(interaction)
+// =====================================================
+// SI NO ES RIVAL DUO → CONTINÚA EL FLUJO NORMAL
+// =====================================================
+
+const group = await getUserGroup(interaction)
+
   if (!group) {
     return interaction.reply({
       content: "❌ No group",
@@ -2550,10 +2584,12 @@ if (interaction.isModalSubmit()) {
 
   // ================= RIVAL DUO REGISTER =================
 
-  if (interaction.customId === "rival_duo_register_modal") {
-await interaction.deferReply({ flags: MessageFlags.Ephemeral })
-    const gameId = interaction.fields.getTextInputValue("game_id").trim()
-    const heartbeatName = interaction.fields.getTextInputValue("heartbeat_name").trim()
+if (interaction.customId === "rival_duo_register_modal") {
+
+  await interaction.deferReply({ flags: MessageFlags.Ephemeral })
+
+  const gameId = interaction.fields.getTextInputValue("game_id").trim()
+  const heartbeatName = interaction.fields.getTextInputValue("heartbeat_name").trim()
 
     if (!isValidGameId(gameId)) {
       return interaction.reply({
