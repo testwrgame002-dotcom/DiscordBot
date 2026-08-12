@@ -2094,7 +2094,7 @@ if (
   interaction.customId.startsWith("rival_duo_group_select_")
 ) {
   try {
-    
+    await interaction.deferUpdate()
     const prefix = "rival_duo_group_select_"
     const payload = interaction.customId.slice(prefix.length)
 
