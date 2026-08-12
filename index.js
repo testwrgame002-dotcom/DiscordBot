@@ -2097,58 +2097,95 @@ if (
   }
 }
   
-const isRivalDuoButton = ["online", "offline"].includes(interaction.customId) &&
-  await isActiveRivalDuo(interaction)
+const isRivalDuoButton =
+  ["online", "offline"].includes(interaction.customId)
 
 if (isRivalDuoButton) {
   try {
-if (interaction.customId === "online") {
-  const result = await setRivalDuoOnline(
-    interaction.user.id
-  )
 
-  if (!result.ok) {
-    return interaction.editReply(
-      result.message
-    )
-  }
+    // ACK INMEDIATO para evitar:
+    // "This interaction failed"
+    // / "The bot did not respond in time"
+    if (!interaction.deferred && !interaction.replied) {
+      await interaction.deferReply({
+        flags: MessageFlags.Ephemeral
+      })
+    }
 
-  return interaction.editReply({
-    content:
-      result.message +
-      "\n\n**Both members must select the same group.**",
-    components: [
-      buildRivalDuoGroupMenu(
-        result.duo,
-        interaction.user.id
-      )
-    ]
-  })
-}
+    // Ahora sí hacemos la consulta a Redis
+    const activeRivalDuo =
+      await isActiveRivalDuo(interaction)
 
-    if (interaction.customId === "offline") {
-      const result = await setRivalDuoOffline(interaction.user.id, "manual_offline")
-
+    if (!activeRivalDuo) {
       return interaction.editReply(
-        result?.message || "❌ Rival Duo offline failed without response."
+        "❌ This button is only available for active Rival Duo members."
       )
     }
+
+    if (interaction.customId === "online") {
+      const result = await setRivalDuoOnline(
+        interaction.user.id
+      )
+
+      if (!result.ok) {
+        return interaction.editReply(
+          result.message
+        )
+      }
+
+      return interaction.editReply({
+        content:
+          result.message +
+          "\n\n**Both members must select the same group.**",
+        components: [
+          buildRivalDuoGroupMenu(
+            result.duo,
+            interaction.user.id
+          )
+        ]
+      })
+    }
+
+    if (interaction.customId === "offline") {
+      const result = await setRivalDuoOffline(
+        interaction.user.id,
+        "manual_offline"
+      )
+
+      return interaction.editReply(
+        result?.message ||
+        "❌ Rival Duo offline failed without response."
+      )
+    }
+
   } catch (err) {
-    console.error("RIVAL DUO BUTTON ERROR:", err)
-
-    return interaction.editReply(
-      `❌ Rival Duo error: ${err.message || "Unknown error"}`
+    console.error(
+      "RIVAL DUO BUTTON ERROR:",
+      err
     )
-  }
-}
 
-  const group = await getUserGroup(interaction)
-  if (!group) {
+    if (interaction.deferred || interaction.replied) {
+      return interaction.editReply(
+        `❌ Rival Duo error: ${err.message || "Unknown error"}`
+      )
+    }
+
     return interaction.reply({
-      content: "❌ No group",
+      content:
+        `❌ Rival Duo error: ${err.message || "Unknown error"}`,
       flags: MessageFlags.Ephemeral
     })
   }
+}
+
+const group = await getUserGroup(interaction)
+
+if (!group) {
+  return interaction.reply({
+    content: "❌ No group",
+    flags: MessageFlags.Ephemeral
+  })
+}
 
 const isModalButton = modalButtonIds.includes(interaction.customId)
 
@@ -2527,10 +2564,119 @@ const currentRole =
 // ================= MODALES =================
 if (interaction.isModalSubmit()) {
 
+  // ================= RIVAL DUO REGISTER =================
+
+  if (interaction.customId === "rival_duo_register_modal") {
+
+    // ACK INMEDIATO
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    })
+
+    try {
+
+      const gameId =
+        interaction.fields
+          .getTextInputValue("game_id")
+          .trim()
+
+      const heartbeatName =
+        interaction.fields
+          .getTextInputValue("heartbeat_name")
+          .trim()
+
+      if (!isValidGameId(gameId)) {
+        return interaction.editReply(
+          "❌ The ID must be exactly 16 digits."
+        )
+      }
+
+      const pending = {
+        discordId: interaction.user.id,
+        name:
+          interaction.member?.displayName ||
+          interaction.user.username,
+        heartbeatName,
+        gameId
+      }
+
+      await savePendingRivalDuoRegistration(
+        interaction.user.id,
+        pending
+      )
+
+      const openDuos =
+        await findOpenRivalDuos()
+
+      if (!openDuos.length) {
+
+        const result =
+          await registerRivalDuoMember(
+            pending
+          )
+
+        if (result.ok) {
+          await redis.set(
+            `active_roles:${interaction.user.id}`,
+            "Rival_Duo"
+          )
+        }
+
+        return interaction.editReply(
+          result.message
+        )
+      }
+
+      const menu =
+        new StringSelectMenuBuilder()
+          .setCustomId(
+            `rival_duo_select_${interaction.user.id}`
+          )
+          .setPlaceholder(
+            "Select open Duo or create new"
+          )
+          .addOptions([
+            {
+              label: "Create new Rival Duo",
+              value: "create_new"
+            },
+            ...openDuos
+              .slice(0, 24)
+              .map(duo => ({
+                label:
+                  displayRivalDuoName(duo)
+                    .slice(0, 100),
+                value: duo.id
+              }))
+          ])
+
+      return interaction.editReply({
+        content:
+          "There are open Rival Duo registrations. Select one or create a new Duo.",
+        components: [
+          new ActionRowBuilder()
+            .addComponents(menu)
+        ]
+      })
+
+    } catch (err) {
+
+      console.error(
+        "RIVAL DUO REGISTER ERROR:",
+        err
+      )
+
+      return interaction.editReply(
+        `❌ Rival Duo registration error: ${err.message || "Unknown error"}`
+      )
+    }
+  }
+
+  // ================= REST OF YOUR MODALS =================
+
   const group = await getUserGroup(interaction)
 
   if (
-    interaction.customId !== "rival_duo_register_modal" &&
     interaction.customId !== "gp_modal" &&
     !group
   ) {
@@ -2566,22 +2712,22 @@ if (interaction.isModalSubmit()) {
 
     const openDuos = await findOpenRivalDuos()
 
-    if (!openDuos.length) {
+if (!openDuos.length) {
 
-      const result = await registerRivalDuoMember(pending)
+  const result = await registerRivalDuoMember(pending)
 
-      if (result.ok) {
+  if (result.ok) {
     await redis.set(
-  `active_roles:${interaction.user.id}`,
-  selected
-)
-      }
+      `active_roles:${interaction.user.id}`,
+      "Rival_Duo"
+    )
+  }
 
-      return interaction.reply({
-        content: result.message,
-        flags: MessageFlags.Ephemeral
-      })
-    }
+  return interaction.reply({
+    content: result.message,
+    flags: MessageFlags.Ephemeral
+  })
+}
 
     const menu = new StringSelectMenuBuilder()
       .setCustomId(`rival_duo_select_${interaction.user.id}`)
@@ -2605,23 +2751,38 @@ if (interaction.isModalSubmit()) {
   }
 
 if (interaction.customId === "change_modal") {
+
+  await interaction.deferReply({
+    flags: MessageFlags.Ephemeral
+  })
+
   if (await isActiveRivalDuo(interaction)) {
-    const id = interaction.fields.getTextInputValue("id").trim()
+
+    const id =
+      interaction.fields
+        .getTextInputValue("id")
+        .trim()
 
     if (!isValidId(id)) {
-      return interaction.reply({
-        content: "❌ ID must be exactly 16 digits",
-        flags: MessageFlags.Ephemeral
-      })
+      return interaction.editReply(
+        "❌ ID must be exactly 16 digits"
+      )
     }
 
-    const result = await changeRivalDuoGameId(interaction.user.id, id)
+    const result =
+      await changeRivalDuoGameId(
+        interaction.user.id,
+        id
+      )
 
-    return interaction.reply({
-      content: result.message,
-      flags: MessageFlags.Ephemeral
-    })
+    return interaction.editReply(
+      result.message
+    )
   }
+
+  // Si change_modal también puede ser usado
+  // por usuarios normales, NO pongas este cambio
+  // sin revisar esa parte.
 }
 
       const config = GROUP_CONFIG[group]
