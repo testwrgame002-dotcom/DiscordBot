@@ -1848,7 +1848,22 @@ if (interaction.isStringSelectMenu()) {
 client.on("interactionCreate", async interaction => {
   try {
     if (!isOwnInteraction(interaction)) return
+    
+if (
+  interaction.isButton() &&
+  (interaction.customId === "online" ||
+   interaction.customId === "offline")
+) {
+  try {
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    })
+  } catch (err) {
+    return
+  }
+}
 
+    
     if (interaction.deferred || interaction.replied) {
       console.warn(
         "Interaction already acknowledged before index handler:",
@@ -2174,12 +2189,7 @@ if (interaction.customId === "online") {
     })
   }
 
-const isModalButton = modalButtonIds.includes(interaction.customId)
 
-if (!isModalButton && !interaction.deferred && !interaction.replied) {
-  console.log("Index handling button:", interaction.customId, "user:", interaction.user.id)
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral })
-}
 
       const config = GROUP_CONFIG[group]
 
