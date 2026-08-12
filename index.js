@@ -1979,13 +1979,6 @@ if (
 
     return interaction.editReply("🔴 OFFLINE")
 
-  } catch (err) {
-    console.error("ONLINE/OFFLINE ERROR:", err)
-
-    return interaction.editReply(
-      `❌ Error: ${err.message || "Unknown error"}`
-    )
-  }
 }
 
 if (interaction.deferred || interaction.replied) {
