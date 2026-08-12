@@ -1931,8 +1931,20 @@ if (interaction.isButton()) {
   const modalButtonIds = ["register", "add_sec", "change", "schedule", "gp", "heartbeat_name"]
 const willOpenModal = modalButtonIds.includes(interaction.customId)
 
-if (!willOpenModal && !interaction.deferred && !interaction.replied) {
-  await interaction.deferReply({ flags: MessageFlags.Ephemeral })
+if (
+  interaction.isButton() &&
+  ["online", "offline"].includes(interaction.customId)
+) {
+  if (!interaction.deferred && !interaction.replied) {
+    await interaction.deferReply({
+      flags: MessageFlags.Ephemeral
+    })
+  }
+}
+else if (!willOpenModal && !interaction.deferred && !interaction.replied) {
+  await interaction.deferReply({
+    flags: MessageFlags.Ephemeral
+  })
 }
 if (interaction.customId === "change" && await isActiveRivalDuo(interaction)) {
   const modal = new ModalBuilder()
@@ -1944,6 +1956,7 @@ if (interaction.customId === "change" && await isActiveRivalDuo(interaction)) {
       new TextInputBuilder()
         .setCustomId("id")
         .setLabel("New 16 digit ID")
+      
         .setStyle(TextInputStyle.Short)
         .setRequired(true)
     )
