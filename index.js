@@ -397,12 +397,6 @@ const saved = await saveRivalDuo(duo)
   }
 
 
-  if (!indexed) {
-    return {
-      ok: false,
-      message: "❌ Rival Duo was saved, but indexes could not be updated."
-    }
-  }
 
   if (isRivalDuoFull(reloaded)) {
     return {
@@ -1950,6 +1944,7 @@ if (
   interaction.customId.startsWith("rival_duo_group_select_")
 ) {
   try {
+    await interaction.deferUpdate()
     const prefix = "rival_duo_group_select_"
     const payload = interaction.customId.slice(prefix.length)
 
@@ -1965,7 +1960,7 @@ if (
       String(interaction.user.id) !==
       String(discordId)
     ) {
-      return interaction.update({
+      return interaction.editReply({
         content: "❌ This menu is not for you.",
         components: []
       })
@@ -1978,7 +1973,7 @@ if (
       await getRivalDuoById(duoId)
 
     if (!duo) {
-      return interaction.update({
+      return interaction.editReply({
         content:
           "❌ This Rival Duo no longer exists.",
         components: []
@@ -1986,7 +1981,7 @@ if (
     }
 
     if (!duo.members?.[discordId]) {
-      return interaction.update({
+      return interaction.editReply({
         content:
           "❌ You are not a member of this Rival Duo.",
         components: []
@@ -2000,14 +1995,14 @@ if (
       )
 
     if (!result.ok) {
-      return interaction.update({
+      return interaction.editReply({
         content: result.message,
         components: []
       })
     }
 
     if (result.waiting) {
-      return interaction.update({
+      return interaction.editReply({
         content: result.message,
         components: []
       })
@@ -2039,7 +2034,7 @@ if (
         }
       }
 
-      return interaction.update({
+      return interaction.editReply({
         content: result.message,
         components: []
       })
@@ -2071,13 +2066,13 @@ if (
         }
       }
 
-      return interaction.update({
+      return interaction.editReply({
         content: result.message,
         components: []
       })
     }
 
-    return interaction.update({
+    return interaction.editReply({
       content:
         result.message,
       components: []
@@ -2089,7 +2084,7 @@ if (
       err
     )
 
-    return interaction.update({
+    return interaction.editReply({
       content:
         `❌ Rival Duo group selection error: ${err.message}`,
       components: []
@@ -2543,7 +2538,7 @@ if (interaction.isModalSubmit()) {
   // ================= RIVAL DUO REGISTER =================
 
   if (interaction.customId === "rival_duo_register_modal") {
-
+await interaction.deferReply({ flags: MessageFlags.Ephemeral })
     const gameId = interaction.fields.getTextInputValue("game_id").trim()
     const heartbeatName = interaction.fields.getTextInputValue("heartbeat_name").trim()
 
@@ -2577,10 +2572,9 @@ if (interaction.isModalSubmit()) {
 )
       }
 
-      return interaction.reply({
-        content: result.message,
-        flags: MessageFlags.Ephemeral
-      })
+return interaction.editReply({
+content: result.message
+})
     }
 
     const menu = new StringSelectMenuBuilder()
@@ -2892,14 +2886,12 @@ const result = await registerRivalDuoMember({
   ...pending,
   duoId: selected === "create_new" ? null : selected
 })
-
 if (result.ok) {
 await redis.set(
-  `active_roles:${interaction.user.id}`,
-  selected
+`active_roles:${interaction.user.id}`,
+"Rival_Duo"
 )
 }
-
 await clearPendingRivalDuoRegistration(interaction.user.id)
 
 return interaction.update({
