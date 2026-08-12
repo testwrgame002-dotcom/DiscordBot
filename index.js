@@ -1959,7 +1959,7 @@ if (
   interaction.customId.startsWith("rival_duo_group_select_")
 ) {
   try {
-    await interaction.deferUpdate()
+    
     const prefix = "rival_duo_group_select_"
     const payload = interaction.customId.slice(prefix.length)
 
@@ -2113,20 +2113,14 @@ const isRivalDuoButton =
 
 if (isRivalDuoButton) {
 
-if (!interaction.replied && !interaction.deferred) {
-  await interaction.deferReply({
-    flags: MessageFlags.Ephemeral
-  })
+const isRivalDuo =
+await isActiveRivalDuo(interaction)
+
+if (!isRivalDuo) {
+return
 }
 
-  const isRivalDuo =
-    await isActiveRivalDuo(interaction)
-
-  if (!isRivalDuo) {
-    return
-  }
-
-  try {
+try {
 
     if (interaction.customId === "online") {
 
