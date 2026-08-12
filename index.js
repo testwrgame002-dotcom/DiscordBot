@@ -1897,12 +1897,139 @@ client.on("interactionCreate", async interaction => {
   }
 }
 
+if (
+  interaction.isButton() &&
+  ["online", "offline"].includes(interaction.customId)
+) {
+  await interaction.deferReply({
+    flags: MessageFlags.Ephemeral
+  })
+
+  try {
+    const isRivalDuo = await isActiveRivalDuo(interaction)
+
+    // ================= RIVAL DUO =================
+    if (isRivalDuo) {
+
+      if (interaction.customId === "online") {
+        const result = await setRivalDuoOnline(
+          interaction.user.id
+        )
+
+        if (!result.ok) {
+          return interaction.editReply(result.message)
+        }
+
+        return interaction.editReply({
+          content:
+            result.message +
+            "\n\n**Both members must select the same group.**",
+          components: [
+            buildRivalDuoGroupMenu(
+              result.duo,
+              interaction.user.id
+            )
+          ]
+        })
+      }
+
+      const result = await setRivalDuoOffline(
+        interaction.user.id,
+        "manual_offline"
+      )
+
+      return interaction.editReply(
+        result?.message || "❌ Rival Duo offline failed."
+      )
+    }
+
+    // ================= ONLINE NORMAL =================
+
+    const group = await getUserGroup(interaction)
+
+    if (!group) {
+      return interaction.editReply("❌ No group")
+    }
+
+    const found = await findUserRegistration(
+      interaction.user.id,
+      group
+    )
+
+    if (!found) {
+      return interaction.editReply("❌ Register first")
+    }
+
+    const { group: foundGroup, userData } = found
+
+    if (interaction.customId === "online") {
+
+      if (!userData?.main_id) {
+        return interaction.editReply("❌ Register first")
+      }
+
+      const onlineIds = await getOnlineIDs(foundGroup)
+
+      if (onlineIds.length >= 10) {
+        return interaction.editReply(
+          `❌ The **${foundGroup}** group already has the maximum of **10** users online.`
+        )
+      }
+
+      const ok = await setOnlineStatus(
+        "online",
+        userData.main_id,
+        foundGroup
+      )
+
+      if (!ok) {
+        return interaction.editReply("❌ Could not set online")
+      }
+
+      return interaction.editReply(
+        "🟢 ONLINE. It now appears in Online List."
+      )
+    }
+
+    // ================= OFFLINE NORMAL =================
+
+    let okMain = true
+    let okSec = true
+
+    if (userData.main_id) {
+      okMain = await setOnlineStatus(
+        "offline",
+        userData.main_id,
+        foundGroup
+      )
+    }
+
+    if (userData.sec_id) {
+      okSec = await setOnlineStatus(
+        "offline",
+        userData.sec_id,
+        foundGroup
+      )
+    }
+
+    if (!okMain || !okSec) {
+      return interaction.editReply(
+        "❌ Some IDs could not be set offline"
+      )
+    }
+
+    return interaction.editReply("🔴 OFFLINE")
+
+  } catch (err) {
+    console.error("ONLINE/OFFLINE ERROR:", err)
+
+    return interaction.editReply(
+      `❌ Error: ${err.message || "Unknown error"}`
+    )
+  }
+}
+
 if (interaction.deferred || interaction.replied) {
-  console.warn(
-    "Interaction already acknowledged before index handler:",
-    interaction.customId,
-    interaction.user.id
-  )
   return
 }
 
