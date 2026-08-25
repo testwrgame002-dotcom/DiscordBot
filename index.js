@@ -642,7 +642,7 @@ async function activateRivalDuoId(duo, force = false) {
     duo.id
   )
 
-  if (onlineCount >= 10) {
+  if (onlineCount >= 25) {
     await removeRivalDuoIdsFromGroups(duo)
 
     duo.activeGameId = null
@@ -659,7 +659,7 @@ async function activateRivalDuoId(duo, force = false) {
       group: selectedGroup,
       message:
         `⚠️ The **${getGroupLabel(selectedGroup)}** group is currently full ` +
-        `(**10/10**).\n` +
+        `(**25/25**).\n` +
         `Your Rival Duo remains **online** and is waiting for a free slot.`
     }
   }
