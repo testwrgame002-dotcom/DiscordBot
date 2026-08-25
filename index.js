@@ -2090,7 +2090,7 @@ if (
 
           await user.send(
             `⚠️ **Rival Duo could not enter ${getGroupLabel(selectedGroup)}.**\n\n` +
-            `The group is currently full (**10/10**).\n\n` +
+            `The group is currently full (**25/25**).\n\n` +
             `Your Rival Duo remains **online** and will wait for a free slot.`
           )
 
