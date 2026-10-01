@@ -1556,34 +1556,13 @@ async function addVipID(id, group) {
 // ===== GROUP =====
 async function getUserGroup(interaction) {
   const memberGroups = getMemberSelectableRoles(interaction.member)
+  if (!memberGroups.length) return null
 
-  if (!memberGroups.length) {
-    return null
-  }
-
-  // Primero: buscar el registro real del usuario.
-  // El Discord ID es la identidad del registro.
-  for (const group of memberGroups) {
-    if (group === "Rival_Duo") {
-      continue
-    }
-
-    const user = await getUser(interaction.user.id, group)
-
-    if (user) {
-      return group
-    }
-  }
-
-  // Si todavía no está registrado, usar la selección activa.
-  let savedRole = await redis.get(
-    `active_roles:${interaction.user.id}`
-  )
+  let savedRole = await redis.get(`active_roles:${interaction.user.id}`)
 
   if (!savedRole) {
     try {
       const oldRoles = await redis.hgetall(activeRolesKey())
-
       if (oldRoles && typeof oldRoles === "object") {
         savedRole = oldRoles[interaction.user.id]
       }
@@ -1592,24 +1571,19 @@ async function getUserGroup(interaction) {
     }
   }
 
-  if (
-    savedRole &&
-    memberGroups.includes(savedRole) &&
-    savedRole !== "Rival_Duo"
-  ) {
+  if (savedRole && memberGroups.includes(savedRole)) {
     return savedRole
   }
 
   const priority = [
+    "Rival_Duo",
     "Elite_Four",
     "Gym_Leader",
     "Trainer"
   ]
 
   for (const role of priority) {
-    if (memberGroups.includes(role)) {
-      return role
-    }
+    if (memberGroups.includes(role)) return role
   }
 
   return null
