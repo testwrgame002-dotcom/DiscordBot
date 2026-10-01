@@ -70,27 +70,58 @@ function activeRolesKey() {
 }
 
 function safeJsonParse(value, fallback = null) {
-  if (value === null || value === undefined) {
-    return fallback
+  let v = value
+
+  // hasta 3 pasadas por si quedó doblemente codificado ("\"{...}\"")
+  for (let i = 0; i < 3; i++) {
+    if (v === null || v === undefined) return fallback
+    if (typeof v === "object") return v
+    if (typeof v !== "string") return fallback
+
+    let s = v
+      .trim()
+      .replace(/^\uFEFF/, "")        // BOM invisible
+      .replace(/[“”]/g, '"')         // comillas tipográficas
+      .replace(/,\s*$/, "")          // coma final tipo "},"
+
+    try {
+      v = JSON.parse(s)
+    } catch (error) {
+      console.error("❌ JSON ilegible en Redis:", s.slice(0, 200))
+      return fallback
+    }
   }
 
-  if (typeof value !== "string") {
-    return value
-  }
-
-  try {
-    return JSON.parse(value)
-  } catch (error) {
-    console.error("❌ Error leyendo registro de Redis:", error)
-    return fallback
-  }
+  return typeof v === "object" ? v : fallback
 }
+
 function uniqueList(arr) {
   return [...new Set(
     arr
       .map(x => String(x || "").trim())
       .filter(Boolean)
   )]
+}
+function normalizeUser(raw) {
+  if (!raw || typeof raw !== "object") return null
+
+  const cleanId = v => {
+    const s = String(v ?? "").replace(/\s+/g, "").trim()
+    return s || null
+  }
+
+  const name = String(raw.name ?? "").trim() || "Unknown"
+
+  return {
+    ...raw,
+    name,
+    heartbeatName: String(raw.heartbeatName ?? "").trim() || name,
+    aliases: Array.isArray(raw.aliases)
+      ? uniqueList(raw.aliases)
+      : uniqueList([name]),
+    main_id: cleanId(raw.main_id ?? raw.mainId),
+    sec_id: cleanId(raw.sec_id ?? raw.secId)
+  }
 }
 
 function buildUserData(oldData, interaction, updates = {}) {
@@ -1364,30 +1395,35 @@ async function saveSchedules(data) {
 
 async function getUsers(group) {
   const data = await redis.hgetall(usersKey(group))
-
-  if (!data || typeof data !== "object") {
-    return {}
-  }
+  if (!data || typeof data !== "object") return {}
 
   const users = {}
 
   for (const [discordId, rawData] of Object.entries(data)) {
-    const parsed = safeJsonParse(rawData, null)
+    const user = normalizeUser(safeJsonParse(rawData, null))
 
-    // Si Redis contiene un registro que no se puede leer,
-    // NO lo convertimos en {} ni lo devolvemos como registro vacío.
-    if (!parsed || typeof parsed !== "object") {
-      console.error(
-        `⚠️ Registro inválido en Redis: ${usersKey(group)} -> ${discordId}`
-      )
+    if (!user) {
+      console.error(`⚠️ Registro inválido: ${usersKey(group)} -> ${discordId}`, rawData)
       continue
     }
 
-    users[discordId] = parsed
+    users[String(discordId).trim()] = user
   }
 
   return users
 }
+
+async function getUser(discordId, group) {
+  try {
+    const rawData = await redis.hget(usersKey(group), String(discordId))
+    if (!rawData) return null
+    return normalizeUser(safeJsonParse(rawData, null))
+  } catch (error) {
+    console.error(`❌ Error leyendo usuario ${discordId} en ${group}:`, error)
+    return null
+  }
+}
+
 async function getUser(discordId, group) {
   try {
     const rawData = await redis.hget(usersKey(group), String(discordId))
@@ -1426,34 +1462,18 @@ async function saveUser(discordId, user, group) {
   return true
 }
 async function findUserRegistration(discordId, preferredGroup = null) {
+  const allGroups = Object.keys(GROUP_CONFIG)
 
-  // SI HAY GRUPO PREFERIDO → USAR SOLO ESE
-  if (preferredGroup && GROUP_CONFIG[preferredGroup]) {
+  const groups = (preferredGroup && GROUP_CONFIG[preferredGroup])
+    ? [preferredGroup, ...allGroups.filter(g => g !== preferredGroup)]
+    : allGroups
 
-    const users = await getUsers(preferredGroup)
-
-    if (users[discordId]) {
-      return {
-        group: preferredGroup,
-        userData: users[discordId],
-        users
-      }
-    }
-
-    return null
-  }
-
-  // FALLBACK
-  for (const group of Object.keys(GROUP_CONFIG)) {
-
+  for (const group of groups) {
     const users = await getUsers(group)
+    const userData = users[String(discordId)]
 
-    if (users[discordId]) {
-      return {
-        group,
-        userData: users[discordId],
-        users
-      }
+    if (userData) {
+      return { group, userData, users }
     }
   }
 
