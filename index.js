@@ -2549,6 +2549,12 @@ const currentRole =
 if (interaction.isModalSubmit()) {
 
   const group = await getUserGroup(interaction)
+  //temporal eliminar
+
+  console.log("🔎 HEARTBEAT DEBUG:", {
+  discordId: interaction.user.id,
+  group
+})
 
   if (
     interaction.customId !== "rival_duo_register_modal" &&
