@@ -2868,10 +2868,6 @@ if (alreadyUsed) {
 
   const selected = interaction.values[0]
 
-const result = await registerRivalDuoMember({
-  ...pending,
-  duoId: selected === "create_new" ? null : selected
-})
 
 const result = await registerRivalDuoMember({
   ...pending,
