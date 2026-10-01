@@ -69,12 +69,19 @@ function activeRolesKey() {
   return "active_roles"
 }
 
-function safeJsonParse(value, fallback = {}) {
+function safeJsonParse(value, fallback = null) {
+  if (value === null || value === undefined) {
+    return fallback
+  }
+
+  if (typeof value !== "string") {
+    return value
+  }
+
   try {
-    if (!value) return fallback
-    if (typeof value === "object") return value
     return JSON.parse(value)
-  } catch {
+  } catch (error) {
+    console.error("❌ Error leyendo registro de Redis:", error)
     return fallback
   }
 }
@@ -419,15 +426,8 @@ async function removeRivalDuoIdsFromElite(duo) {
 
   if (!ids.length) return
 
-  await redis.srem(
-  "online:Elite_Four",
-  member.gameId
-)
-
-await redis.srem(
-  "online:Gym_Leader",
-  member.gameId
-)
+  await redis.srem("online:Elite_Four", ...ids)
+  await redis.srem("online:Gym_Leader", ...ids)
 }
 
 function ensureRivalDuoGroupState(duo) {
@@ -1056,34 +1056,11 @@ async function changeRivalDuoGameId(discordId, newGameId) {
       message: `✅ Your Rival Duo ID is already **${newGameId}**.`
     }
   }
-
 if (oldGameId && isValidGameId(oldGameId)) {
-  await redis.srem(
-  "online:Elite_Four",
-  oldGameId
-)
-
-await redis.srem(
-  "online:Gym_Leader",
-  oldGameId
-)
-
-  if (typeof redis.hdel === "function") {
-    await redis.hdel(RIVAL_DUO_BY_GAMEID_KEY, oldGameId)
-  } else {
-    const indexes = await redis.hgetall(RIVAL_DUO_BY_GAMEID_KEY)
-
-    if (indexes && typeof indexes === "object") {
-      delete indexes[oldGameId]
-
-      await redis.del(RIVAL_DUO_BY_GAMEID_KEY)
-
-      if (Object.keys(indexes).length > 0) {
-        await redis.hset(RIVAL_DUO_BY_GAMEID_KEY, indexes)
-      }
-    }
-  }
+  await redis.srem("online:Elite_Four", oldGameId)
+  await redis.srem("online:Gym_Leader", oldGameId)
 }
+
 
   member.gameId = newGameId
   member.updatedAt = rivalNow()
@@ -1320,21 +1297,6 @@ function isValidId(id) {
 }
 
 async function isGameIdAlreadyUsed(id, group) {
-  id = String(id).trim()
-
-  // Solo revisar el grupo actual
-  const users = await getUsers(group)
-
-  for (const uid in users) {
-    const u = users[uid]
-
-    if (
-      String(u.main_id || "").trim() === id ||
-      String(u.sec_id || "").trim() === id
-    ) {
-      return true
-    }
-  }
 
   return false
 }
@@ -1392,29 +1354,30 @@ async function saveSchedules(data) {
 }
 
 async function getUsers(group) {
-  try {
-    if (!GROUP_CONFIG[group]) {
-      console.error("getUsers invalid group:", group)
-      return {}
-    }
+  const data = await redis.hgetall(usersKey(group))
 
-    const data = await redis.hgetall(usersKey(group))
-
-    if (!data || typeof data !== "object") {
-      return {}
-    }
-
-    const users = {}
-
-    for (const uid in data) {
-      users[uid] = safeJsonParse(data[uid], {})
-    }
-
-    return users
-  } catch (err) {
-    console.error(`Error loading users from Redis for ${group}:`, err)
+  if (!data || typeof data !== "object") {
     return {}
   }
+
+  const users = {}
+
+  for (const [discordId, rawData] of Object.entries(data)) {
+    const parsed = safeJsonParse(rawData, null)
+
+    // Si Redis contiene un registro que no se puede leer,
+    // NO lo convertimos en {} ni lo devolvemos como registro vacío.
+    if (!parsed || typeof parsed !== "object") {
+      console.error(
+        `⚠️ Registro inválido en Redis: ${usersKey(group)} -> ${discordId}`
+      )
+      continue
+    }
+
+    users[discordId] = parsed
+  }
+
+  return users
 }
 
 async function findUserRegistration(discordId, preferredGroup = null) {
@@ -1453,28 +1416,24 @@ async function findUserRegistration(discordId, preferredGroup = null) {
 }
 
 async function saveUsers(users, group) {
-  try {
-    if (!GROUP_CONFIG[group]) {
-      console.error("saveUsers invalid group:", group)
-      return false
+  const key = usersKey(group)
+
+  if (!users || typeof users !== "object") {
+    return
+  }
+
+  const data = {}
+
+  for (const [discordId, user] of Object.entries(users)) {
+    if (!user || typeof user !== "object") {
+      continue
     }
 
-    const key = usersKey(group)
+    data[discordId] = JSON.stringify(user)
+  }
 
-    const payload = {}
-
-    for (const uid in users) {
-      payload[uid] = JSON.stringify(users[uid])
-    }
-
-    if (Object.keys(payload).length > 0) {
-      await redis.hset(key, payload)
-    }
-
-    return true
-  } catch (err) {
-    console.error(`Error saving users to Redis for ${group}:`, err)
-    return false
+  if (Object.keys(data).length > 0) {
+    await redis.hset(key, data)
   }
 }
 
@@ -2914,12 +2873,17 @@ const result = await registerRivalDuoMember({
   duoId: selected === "create_new" ? null : selected
 })
 
-if (result.ok) {
-await redis.set(
-  `active_roles:${interaction.user.id}`,
-  selected
-)
-}
+const result = await registerRivalDuoMember({
+  ...pending,
+  duoId: selected === "create_new" ? null : selected
+})
+
+await clearPendingRivalDuoRegistration(interaction.user.id)
+
+return interaction.update({
+  content: result.message,
+  components: []
+})
 
 await clearPendingRivalDuoRegistration(interaction.user.id)
 
