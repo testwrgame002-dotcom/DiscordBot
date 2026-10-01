@@ -495,6 +495,15 @@ async function getRivalDuoSelectedGroup(duo) {
   }
 }
 
+async function saveUser(discordId, user, group) {
+  if (!discordId || !group || !user || typeof user !== "object") {
+    return
+  }
+
+  await redis.hset(usersKey(group), {
+    [String(discordId)]: JSON.stringify(user)
+  })
+}
 
 async function getOnlineUserCountExcludingDuo(group, duoId = null) {
   const onlineIds = await getOnlineIDs(group)
@@ -2759,7 +2768,8 @@ if (alreadyUsed) {
     })
   }
 
-const oldData = await getUser(interaction.user.id, group)
+const users = await getUsers(group)
+const oldData = users[interaction.user.id]
 
 if (!oldData?.main_id) {
   return interaction.reply({
@@ -2768,7 +2778,7 @@ if (!oldData?.main_id) {
   })
 }
 
-const updatedUser = buildUserData(oldData, interaction, {
+users[interaction.user.id] = buildUserData(oldData, interaction, {
   heartbeatName,
   aliases: uniqueList([
     ...(Array.isArray(oldData.aliases) ? oldData.aliases : []),
@@ -2778,9 +2788,11 @@ const updatedUser = buildUserData(oldData, interaction, {
   ])
 })
 
-await saveUser(interaction.user.id, updatedUser, group)
-
-        
+await saveUser(
+  interaction.user.id,
+  users[interaction.user.id],
+  group
+)  
 
   return interaction.reply({
     content:
