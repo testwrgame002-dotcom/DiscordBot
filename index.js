@@ -1379,7 +1379,43 @@ async function getUsers(group) {
 
   return users
 }
+async function getUser(discordId, group) {
+  try {
+    const rawData = await redis.hget(usersKey(group), String(discordId))
 
+    if (!rawData) {
+      return null
+    }
+
+    const parsed = safeJsonParse(rawData, null)
+
+    if (!parsed || typeof parsed !== "object") {
+      console.error(
+        `⚠️ Registro inválido en Redis: ${usersKey(group)} -> ${discordId}`
+      )
+      return null
+    }
+
+    return parsed
+  } catch (error) {
+    console.error(
+      `❌ Error leyendo usuario ${discordId} en ${group}:`,
+      error
+    )
+    return null
+  }
+}
+async function saveUser(discordId, user, group) {
+  if (!discordId || !group || !user || typeof user !== "object") {
+    return false
+  }
+
+  await redis.hset(usersKey(group), {
+    [String(discordId)]: JSON.stringify(user)
+  })
+
+  return true
+}
 async function findUserRegistration(discordId, preferredGroup = null) {
 
   // SI HAY GRUPO PREFERIDO → USAR SOLO ESE
@@ -2731,26 +2767,28 @@ if (alreadyUsed) {
     })
   }
 
-  const oldData = users[interaction.user.id]
+const oldData = await getUser(interaction.user.id, group)
 
-  if (!oldData?.main_id) {
-    return interaction.reply({
-      content: "❌ Register first.",
-      flags: MessageFlags.Ephemeral
-    })
-  }
-
-  users[interaction.user.id] = buildUserData(oldData, interaction, {
-    heartbeatName,
-    aliases: uniqueList([
-      ...(Array.isArray(oldData.aliases) ? oldData.aliases : []),
-      oldData.name,
-      oldData.heartbeatName,
-      heartbeatName
-    ])
+if (!oldData?.main_id) {
+  return interaction.reply({
+    content: "Register first.",
+    ephemeral: true
   })
+}
 
-  await saveUsers(users, group)
+const updatedUser = buildUserData(oldData, interaction, {
+  heartbeatName,
+  aliases: uniqueList([
+    ...(Array.isArray(oldData.aliases) ? oldData.aliases : []),
+    oldData.name,
+    oldData.heartbeatName,
+    heartbeatName
+  ])
+})
+
+await saveUser(interaction.user.id, updatedUser, group)
+
+        
 
   return interaction.reply({
     content:
